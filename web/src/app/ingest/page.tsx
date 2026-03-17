@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { Download, Loader2, FileUp, ClipboardPaste, Link2, BookOpen, Upload, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,8 +15,10 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { SAMPLE_DOCUMENTS } from "@/lib/rag/sample-documents";
 
 import { PipelineFlow, type PipelineStep } from "@/components/pipeline/PipelineFlow";
 import { StepCard } from "@/components/pipeline/StepCard";
@@ -57,6 +59,13 @@ const initialSteps: PipelineStep[] = [
 
 export default function IngestPage() {
   const [url, setUrl] = useState("");
+  const [pasteContent, setPasteContent] = useState("");
+  const [pasteTitle, setPasteTitle] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileContent, setFileContent] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [inputTab, setInputTab] = useState("paste");
+
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState<PipelineStep[]>(initialSteps);
   const [activeStep, setActiveStep] = useState<string | null>(null);
@@ -65,73 +74,175 @@ export default function IngestPage() {
   // Separate chunk comparison state
   const [chunkResults, setChunkResults] = useState<Record<string, { chunks: ChunkResult[]; totalChunks: number; avgTokenCount: number }> | null>(null);
 
-  const handleIngest = useCallback(async () => {
-    if (!url.trim()) return;
-    setLoading(true);
-    setResult(null);
-    setChunkResults(null);
-
-    const updateStep = (id: string, update: Partial<PipelineStep>) => {
-      setSteps((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, ...update } : s))
-      );
+  // Handle file selection
+  const handleFileSelect = useCallback((file: File) => {
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setFileContent(e.target?.result as string);
     };
+    reader.readAsText(file);
+  }, []);
 
-    try {
-      // Reset steps
-      setSteps(initialSteps.map((s) => ({ ...s, status: "idle" })));
-
-      // Stage 1: Fetch document
-      updateStep("fetch", { status: "running" });
-      setActiveStep("fetch");
-
-      const res = await fetch("/api/rag/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, chunk_strategy: "recursive" }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Ingest failed");
+  // Handle drop zone
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file && (file.name.endsWith(".md") || file.name.endsWith(".txt"))) {
+        handleFileSelect(file);
+      } else {
+        toast.error("请上传 .md 或 .txt 文件");
       }
+    },
+    [handleFileSelect]
+  );
 
-      const data: IngestResult = await res.json();
-      setResult(data);
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
 
-      // Update all steps based on stages
-      const stageMap: Record<string, string> = {
-        fetch: "fetch",
-        resolve: "fetch",
-        parse: "parse",
-        chunk: "chunk",
-        embed: "embed",
-        visualize: "embed",
-        store: "embed",
+  // Generic ingest function that handles both URL and content modes
+  const handleIngest = useCallback(
+    async (options?: { content?: string; title?: string; source_type?: string }) => {
+      const isContentMode = !!options?.content;
+      if (!isContentMode && !url.trim()) return;
+
+      setLoading(true);
+      setResult(null);
+      setChunkResults(null);
+
+      const updateStep = (id: string, update: Partial<PipelineStep>) => {
+        setSteps((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, ...update } : s))
+        );
       };
 
-      for (const [stageKey, stage] of Object.entries(data.stages)) {
-        const stepId = stageMap[stageKey];
-        if (stepId) {
-          updateStep(stepId, {
-            status: "completed",
-            durationMs: stage.duration_ms,
-          });
-        }
-      }
+      try {
+        // Reset steps
+        setSteps(initialSteps.map((s) => ({ ...s, status: "idle" })));
 
-      setActiveStep("parse");
-      toast.success(`成功导入文档，生成 ${data.chunks_created} 个分块`);
+        // Stage 1: Fetch document
+        updateStep("fetch", { status: "running" });
+        setActiveStep("fetch");
+
+        const body = isContentMode
+          ? {
+              content: options.content,
+              title: options.title || "Untitled",
+              source_type: options.source_type || "paste",
+              chunk_strategy: "recursive",
+            }
+          : { url, chunk_strategy: "recursive" };
+
+        const res = await fetch("/api/rag/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Ingest failed");
+        }
+
+        const data: IngestResult = await res.json();
+        setResult(data);
+
+        // Update all steps based on stages
+        const stageMap: Record<string, string> = {
+          fetch: "fetch",
+          resolve: "fetch",
+          parse: "parse",
+          chunk: "chunk",
+          embed: "embed",
+          visualize: "embed",
+          store: "embed",
+        };
+
+        for (const [stageKey, stage] of Object.entries(data.stages)) {
+          const stepId = stageMap[stageKey];
+          if (stepId) {
+            updateStep(stepId, {
+              status: "completed",
+              durationMs: stage.duration_ms,
+            });
+          }
+        }
+
+        setActiveStep("parse");
+        toast.success(`成功导入文档，生成 ${data.chunks_created} 个分块`);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        toast.error(`导入失败: ${message}`);
+        setSteps((prev) =>
+          prev.map((s) =>
+            s.status === "running" ? { ...s, status: "error" } : s
+          )
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [url]
+  );
+
+  // Handle paste submit
+  const handlePasteSubmit = useCallback(() => {
+    if (!pasteContent.trim()) return;
+    handleIngest({
+      content: pasteContent,
+      title: pasteTitle || "粘贴文档",
+      source_type: "paste",
+    });
+  }, [pasteContent, pasteTitle, handleIngest]);
+
+  // Handle file submit
+  const handleFileSubmit = useCallback(() => {
+    if (!fileContent.trim()) return;
+    handleIngest({
+      content: fileContent,
+      title: selectedFile?.name || "上传文件",
+      source_type: "file",
+    });
+  }, [fileContent, selectedFile, handleIngest]);
+
+  // Handle Feishu submit (existing flow)
+  const handleFeishuSubmit = useCallback(() => {
+    handleIngest();
+  }, [handleIngest]);
+
+  // Handle sample document import
+  const handleSampleImport = useCallback(
+    (doc: { title: string; content: string }) => {
+      handleIngest({
+        content: doc.content,
+        title: doc.title,
+        source_type: "sample",
+      });
+    },
+    [handleIngest]
+  );
+
+  // Handle import all samples via quick-start
+  const handleImportAllSamples = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/rag/quick-start", { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Quick start failed");
+      }
+      const data = await res.json();
+      toast.success(`成功导入 ${data.documents_created ?? ""} 篇示例文档`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      toast.error(`导入失败: ${message}`);
-      setSteps((prev) =>
-        prev.map((s) => (s.status === "running" ? { ...s, status: "error" } : s))
-      );
+      const message = error instanceof Error ? error.message : "未知错误";
+      toast.error(`批量导入失败: ${message}`);
     } finally {
       setLoading(false);
     }
-  }, [url]);
+  }, []);
 
   // Fetch chunk comparison for multiple strategies
   const handleChunkCompare = useCallback(
@@ -163,40 +274,211 @@ export default function IngestPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">文档摄入工坊</h1>
         <p className="mt-2 text-muted-foreground">
-          输入飞书文档链接，可视化解析、分块、嵌入全过程
+          选择输入方式，可视化解析、分块、嵌入全过程
         </p>
       </div>
 
-      {/* URL Input */}
+      {/* Input Method Tabs */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="size-5" />
-            导入飞书文档
+            选择文档来源
           </CardTitle>
           <CardDescription>
-            粘贴飞书文档链接，系统将自动获取并处理文档内容
+            支持粘贴文本、上传文件、飞书链接或使用示例文档
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2">
-            <Input
-              placeholder="https://xxx.feishu.cn/docx/..."
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="flex-1"
-              onKeyDown={(e) => e.key === "Enter" && handleIngest()}
-              disabled={loading}
-            />
-            <Button onClick={handleIngest} disabled={!url.trim() || loading}>
-              {loading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Download className="size-4" />
-              )}
-              {loading ? "处理中..." : "开始摄入"}
-            </Button>
-          </div>
+          <Tabs value={inputTab} onValueChange={setInputTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="paste" className="gap-1.5">
+                <ClipboardPaste className="size-3.5" />
+                粘贴文本
+              </TabsTrigger>
+              <TabsTrigger value="file" className="gap-1.5">
+                <FileUp className="size-3.5" />
+                上传文件
+              </TabsTrigger>
+              <TabsTrigger value="feishu" className="gap-1.5">
+                <Link2 className="size-3.5" />
+                飞书链接
+              </TabsTrigger>
+              <TabsTrigger value="samples" className="gap-1.5">
+                <BookOpen className="size-3.5" />
+                示例文档
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Tab 1: Paste text */}
+            <TabsContent value="paste">
+              <div className="space-y-3">
+                <Input
+                  placeholder="文档标题（可选）"
+                  value={pasteTitle}
+                  onChange={(e) => setPasteTitle(e.target.value)}
+                  disabled={loading}
+                />
+                <Textarea
+                  placeholder="在此粘贴 Markdown 或纯文本内容..."
+                  value={pasteContent}
+                  onChange={(e) => setPasteContent(e.target.value)}
+                  disabled={loading}
+                  className="min-h-[200px]"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {pasteContent.length > 0
+                      ? `${pasteContent.length} 字符`
+                      : "支持 Markdown 格式"}
+                  </span>
+                  <Button
+                    onClick={handlePasteSubmit}
+                    disabled={!pasteContent.trim() || loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Download className="size-4" />
+                    )}
+                    {loading ? "处理中..." : "开始处理"}
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab 2: File upload */}
+            <TabsContent value="file">
+              <div className="space-y-3">
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/30 transition-colors hover:border-primary/40 hover:bg-muted/50"
+                >
+                  <Upload className="size-8 text-muted-foreground" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium">
+                      拖拽文件到此处，或点击选择文件
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      支持 .md、.txt 文件
+                    </p>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".md,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileSelect(file);
+                    }}
+                  />
+                </div>
+                {selectedFile && (
+                  <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
+                    <div className="flex items-center gap-2">
+                      <FileUp className="size-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {selectedFile.name}
+                      </span>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {(selectedFile.size / 1024).toFixed(1)} KB
+                      </Badge>
+                    </div>
+                    <Button
+                      onClick={handleFileSubmit}
+                      disabled={!fileContent.trim() || loading}
+                    >
+                      {loading ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Download className="size-4" />
+                      )}
+                      {loading ? "处理中..." : "开始处理"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Tab 3: Feishu link (existing) */}
+            <TabsContent value="feishu">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="https://xxx.feishu.cn/docx/..."
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && handleFeishuSubmit()}
+                  disabled={loading}
+                />
+                <Button
+                  onClick={handleFeishuSubmit}
+                  disabled={!url.trim() || loading}
+                >
+                  {loading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  {loading ? "处理中..." : "开始摄入"}
+                </Button>
+              </div>
+            </TabsContent>
+
+            {/* Tab 4: Sample documents */}
+            <TabsContent value="samples">
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {SAMPLE_DOCUMENTS.map((doc, idx) => (
+                    <Card
+                      key={idx}
+                      className="flex flex-col justify-between transition-colors hover:border-primary/30"
+                    >
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">{doc.title}</CardTitle>
+                        <CardDescription className="line-clamp-3 text-xs">
+                          {doc.content.slice(0, 100)}...
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleSampleImport(doc)}
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Download className="size-3.5" />
+                          )}
+                          导入
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                <div className="flex justify-center">
+                  <Button
+                    onClick={handleImportAllSamples}
+                    disabled={loading}
+                    className="gap-2"
+                  >
+                    {loading ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="size-4" />
+                    )}
+                    一键导入全部
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

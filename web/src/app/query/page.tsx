@@ -11,12 +11,19 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { TracePanel } from "@/components/trace/TracePanel";
 import { TraceTimeline } from "@/components/trace/TraceTimeline";
 import { CostEstimator } from "@/components/trace/CostEstimator";
 import { StreamingAnswer } from "@/components/generation/StreamingAnswer";
 import { SourceAttribution } from "@/components/generation/SourceAttribution";
 import { cn } from "@/lib/utils";
+import { PRESET_QUESTIONS } from "@/lib/rag/sample-documents";
 import type { RAGTrace } from "@/types/rag";
 
 type SearchMode = "semantic" | "keyword" | "hybrid";
@@ -110,6 +117,70 @@ export default function QueryPage() {
       setIsLoading(false);
     }
   }, [question, mode, enhancers, isLoading]);
+
+  const handlePresetQuestion = useCallback(
+    (q: string) => {
+      setQuestion(q);
+      // Auto-trigger query after setting question
+      setTimeout(() => {
+        // We need to trigger query with the preset question directly
+        // since state update is async
+        (async () => {
+          setAnswer("");
+          setTrace(null);
+          setIsLoading(true);
+          setIsStreaming(true);
+          setActiveStep(null);
+
+          try {
+            const res = await fetch("/api/rag/query", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                question: q.trim(),
+                mode,
+                enhancers,
+              }),
+            });
+
+            if (!res.ok) {
+              throw new Error(`Query failed: ${res.status}`);
+            }
+
+            const traceHeader = res.headers.get("X-RAG-Trace");
+            if (traceHeader) {
+              try {
+                setTrace(JSON.parse(atob(traceHeader)));
+              } catch {
+                // trace header may be invalid
+              }
+            }
+
+            const reader = res.body?.getReader();
+            if (!reader) {
+              throw new Error("No response body");
+            }
+
+            const decoder = new TextDecoder();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              setAnswer((prev) => prev + decoder.decode(value));
+            }
+          } catch (err) {
+            console.error("Query error:", err);
+            setAnswer(
+              `查询失败: ${err instanceof Error ? err.message : "未知错误"}`
+            );
+          } finally {
+            setIsStreaming(false);
+            setIsLoading(false);
+          }
+        })();
+      }, 0);
+    },
+    [mode, enhancers]
+  );
 
   function handleReset() {
     setQuestion("");
@@ -235,6 +306,37 @@ export default function QueryPage() {
               ))}
             </div>
           </div>
+
+          {/* Preset question pills — shown when input is empty and no answer */}
+          {!question.trim() && !answer && (
+            <div className="space-y-2">
+              <span className="text-xs text-muted-foreground">
+                试试这些问题:
+              </span>
+              <TooltipProvider>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_QUESTIONS.map((pq, idx) => (
+                    <Tooltip key={idx}>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handlePresetQuestion(pq.question)
+                            }
+                            className="inline-flex items-center rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                          />
+                        }
+                      >
+                        {pq.description}
+                      </TooltipTrigger>
+                      <TooltipContent>{pq.question}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </TooltipProvider>
+            </div>
+          )}
         </CardContent>
       </Card>
 

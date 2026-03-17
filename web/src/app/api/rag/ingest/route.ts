@@ -21,37 +21,89 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { url, collection_id, chunk_strategy = 'recursive', chunk_size = 500, chunk_overlap = 50, embedding_dimensions = 1024 } = body;
+    const { url, content, title, source_type, collection_id, chunk_strategy = 'recursive', chunk_size = 500, chunk_overlap = 50, embedding_dimensions = 1024 } = body;
 
-    if (!url) {
-      return NextResponse.json({ error: 'Missing required field: url' }, { status: 400 });
+    // Validate: either content or url must be provided
+    if (!url && !content) {
+      return NextResponse.json({ error: 'Missing required field: url or content' }, { status: 400 });
     }
 
     const stages: Record<string, { status: string; duration_ms: number; data?: unknown }> = {};
 
-    // Stage 1: Resolve feishu link
-    let stageStart = Date.now();
-    const linkInfo = resolveFeishuLink(url);
-    stages.resolve = { status: 'completed', duration_ms: Date.now() - stageStart, data: linkInfo };
+    let parsed: { markdown: string; structure: { headings: Array<{ level: number; text: string }> }; elements: Array<{ type: string; content: string }>; stats: { totalChars: number; headingCount: number; paragraphCount: number; codeBlockCount: number; listCount: number } };
+    let meta: Record<string, unknown>;
+    let sourceUrl: string;
 
-    // Stage 2: Fetch document from feishu
-    stageStart = Date.now();
-    const [blocksRes, metaRes] = await Promise.all([
-      getDocumentContent(linkInfo.documentId),
-      getDocumentMeta(linkInfo.documentId),
-    ]);
-    const blocks = blocksRes?.data?.items ?? [];
-    const meta = metaRes?.data?.document ?? {};
-    stages.fetch = { status: 'completed', duration_ms: Date.now() - stageStart };
+    if (content) {
+      // Direct content mode: skip Feishu fetch, use provided content directly
+      let stageStart = Date.now();
 
-    // Stage 3: Parse blocks to markdown
-    stageStart = Date.now();
-    const parsed = parseFeishuBlocks(blocks);
-    stages.parse = {
-      status: 'completed',
-      duration_ms: Date.now() - stageStart,
-      data: { totalChars: parsed.stats.totalChars, headingCount: parsed.stats.headingCount },
-    };
+      // Extract basic structure from the provided content
+      const headings: Array<{ level: number; text: string }> = [];
+      const lines = (content as string).split('\n');
+      for (const line of lines) {
+        const match = line.match(/^(#{1,6})\s+(.+)/);
+        if (match) {
+          headings.push({ level: match[1].length, text: match[2] });
+        }
+      }
+
+      const paragraphCount = lines.filter((l: string) => l.trim().length > 0 && !l.startsWith('#')).length;
+      const codeBlockCount = ((content as string).match(/```/g) || []).length / 2;
+      const listCount = lines.filter((l: string) => /^\s*[-*+]\s|^\s*\d+\.\s/.test(l)).length;
+
+      parsed = {
+        markdown: content as string,
+        structure: { headings },
+        elements: [{ type: 'text', content: content as string }],
+        stats: {
+          totalChars: (content as string).length,
+          headingCount: headings.length,
+          paragraphCount: Math.max(paragraphCount, 0),
+          codeBlockCount: Math.max(Math.floor(codeBlockCount), 0),
+          listCount,
+        },
+      };
+      meta = { title: title || 'Untitled' };
+      sourceUrl = source_type ? `direct://${source_type}` : 'direct://paste';
+
+      stages.resolve = { status: 'completed', duration_ms: 0, data: { mode: 'direct_content' } };
+      stages.fetch = { status: 'completed', duration_ms: 0, data: { mode: 'direct_content' } };
+      stages.parse = {
+        status: 'completed',
+        duration_ms: Date.now() - stageStart,
+        data: { totalChars: parsed.stats.totalChars, headingCount: parsed.stats.headingCount },
+      };
+    } else {
+      // Feishu URL mode: existing flow
+      // Stage 1: Resolve feishu link
+      let stageStart = Date.now();
+      const linkInfo = resolveFeishuLink(url);
+      stages.resolve = { status: 'completed', duration_ms: Date.now() - stageStart, data: linkInfo };
+
+      // Stage 2: Fetch document from feishu
+      stageStart = Date.now();
+      const [blocksRes, metaRes] = await Promise.all([
+        getDocumentContent(linkInfo.documentId),
+        getDocumentMeta(linkInfo.documentId),
+      ]);
+      const blocks = blocksRes?.data?.items ?? [];
+      meta = (metaRes?.data?.document ?? {}) as Record<string, unknown>;
+      stages.fetch = { status: 'completed', duration_ms: Date.now() - stageStart };
+
+      // Stage 3: Parse blocks to markdown
+      stageStart = Date.now();
+      parsed = parseFeishuBlocks(blocks);
+      stages.parse = {
+        status: 'completed',
+        duration_ms: Date.now() - stageStart,
+        data: { totalChars: parsed.stats.totalChars, headingCount: parsed.stats.headingCount },
+      };
+      sourceUrl = url;
+    }
+
+    // stageStart used in shared stages below
+    let stageStart: number;
 
     // Stage 4: Chunk the content
     stageStart = Date.now();
@@ -93,7 +145,7 @@ export async function POST(request: NextRequest) {
       const { data: col, error: colErr } = await supabase
         .from('collections')
         .insert({
-          name: (meta as Record<string, unknown>).title as string || 'Untitled Collection',
+          name: (meta.title as string) || 'Untitled Collection',
           chunk_strategy,
           chunk_size,
           chunk_overlap,
@@ -106,13 +158,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert document
+    const docTitle = (meta.title as string) || title || 'Untitled';
+    const docSourceType = content ? (source_type || 'paste') : 'feishu';
     const { data: doc, error: docErr } = await supabase
       .from('documents')
       .insert({
         collection_id: collectionId,
-        title: (meta as Record<string, unknown>).title as string || 'Untitled',
-        source_url: url,
-        source_type: 'feishu',
+        title: docTitle,
+        source_url: sourceUrl,
+        source_type: docSourceType,
         raw_content: parsed.markdown,
         metadata: meta,
         token_count: chunks.reduce((sum, c) => sum + c.tokenCount, 0),
@@ -148,7 +202,7 @@ export async function POST(request: NextRequest) {
         vector_previews: vectors.map((v) => v.slice(0, 10)),
       },
       document: {
-        title: (meta as Record<string, unknown>).title,
+        title: meta.title as string,
         markdown: parsed.markdown,
         structure: parsed.structure,
         elements: parsed.elements,

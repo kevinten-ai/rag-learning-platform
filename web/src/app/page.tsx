@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Download,
   BookOpen,
@@ -13,7 +14,10 @@ import {
   Clock,
   ArrowRight,
   Sparkles,
+  Rocket,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   Card,
@@ -23,6 +27,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // ---------------------------------------------------------------------------
@@ -281,9 +286,35 @@ function RecentQueries({
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentQueries, setRecentQueries] = useState<RecentQuery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [quickStartLoading, setQuickStartLoading] = useState(false);
+  const [quickStartProgress, setQuickStartProgress] = useState("");
+
+  async function handleQuickStart() {
+    setQuickStartLoading(true);
+    setQuickStartProgress("正在加载示例文档...");
+    try {
+      setQuickStartProgress("正在处理文档并生成向量嵌入...");
+      const res = await fetch("/api/rag/quick-start", { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Quick start failed");
+      }
+      const data = await res.json();
+      setQuickStartProgress("处理完成！正在跳转...");
+      toast.success(`一键体验完成！已导入 ${data.documents_created ?? ""} 篇示例文档`);
+      router.push("/query");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "未知错误";
+      toast.error(`一键体验失败: ${message}`);
+    } finally {
+      setQuickStartLoading(false);
+      setQuickStartProgress("");
+    }
+  }
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -351,6 +382,36 @@ export default function DashboardPage() {
 
       {/* Stats Summary */}
       <StatsSummary stats={stats} isLoading={isLoading} />
+
+      {/* One-click Quick Start */}
+      <Card className="border-primary/30 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5">
+        <CardContent className="flex flex-col items-center gap-4 py-6 sm:flex-row sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <Rocket className="size-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">一键体验 RAG</h2>
+              <p className="text-sm text-muted-foreground">
+                自动导入示例文档，立即体验完整的 RAG 问答流程
+              </p>
+            </div>
+          </div>
+          <Button
+            size="lg"
+            className="w-full gap-2 sm:w-auto"
+            onClick={handleQuickStart}
+            disabled={quickStartLoading}
+          >
+            {quickStartLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            {quickStartLoading ? quickStartProgress || "处理中..." : "一键体验"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <div>
