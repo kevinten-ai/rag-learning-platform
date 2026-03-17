@@ -325,9 +325,26 @@ export default function KnowledgePage() {
         : "";
       const dims = cols.length > 0 ? cols[0].embedding_dimensions : 0;
 
+      // Fetch actual chunk count instead of estimating
+      let totalChunks = 0;
+      try {
+        const chunksRes = await fetch("/api/rag/collections/chunks-count");
+        if (chunksRes.ok) {
+          const chunksData = await chunksRes.json();
+          totalChunks = chunksData.count ?? 0;
+        }
+      } catch {
+        // Fall back: sum chunk_count from collections if available
+        totalChunks = cols.reduce(
+          (sum: number, c: CollectionData & { chunk_count?: number }) =>
+            sum + (c.chunk_count ?? 0),
+          0
+        );
+      }
+
       setStats({
         totalDocuments: totalDocs,
-        totalChunks: totalDocs * 12, // estimated average chunks per doc
+        totalChunks,
         vectorDimensions: dims,
         lastUpdated: latestUpdated,
       });

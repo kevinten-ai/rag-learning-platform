@@ -251,11 +251,24 @@ export async function POST(request: NextRequest) {
         try {
           const finalTrace = tracer.finalize()
           const supabase = createServerSupabaseClient()
+          const generation = finalTrace.steps.generation
           await supabase.from('query_traces').insert({
             id: finalTrace.id,
             question: finalTrace.question,
-            trace_data: finalTrace,
-            created_at: finalTrace.timestamp,
+            config: {
+              mode,
+              model,
+              enhancers,
+              top_k,
+              rerank,
+              collection_id,
+            },
+            trace: finalTrace,
+            answer: generation.answer,
+            sources: generation.sources,
+            total_duration_ms: finalTrace.totalDurationMs,
+            total_tokens: generation.tokensUsed.total,
+            estimated_cost: generation.estimatedCost,
           })
         } catch {
           // Trace persistence failure is non-critical

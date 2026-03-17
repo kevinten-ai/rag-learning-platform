@@ -27,6 +27,13 @@ export async function generateEmbedding(
   }
 
   const data: EmbeddingResponse = await response.json()
+
+  if (!data.data || data.data.length === 0 || !data.data[0]) {
+    throw new Error(
+      'Zhipu embedding API returned an empty or invalid data array — no embedding was produced for the given input'
+    )
+  }
+
   return {
     embedding: data.data[0].embedding,
     tokensUsed: data.usage.total_tokens,

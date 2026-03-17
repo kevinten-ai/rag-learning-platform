@@ -298,9 +298,26 @@ export default function DashboardPage() {
           0
         );
 
+        // Fetch actual chunk count from Supabase via the collections endpoint
+        let totalChunks = 0;
+        try {
+          const chunksRes = await fetch("/api/rag/collections/chunks-count");
+          if (chunksRes.ok) {
+            const chunksData = await chunksRes.json();
+            totalChunks = chunksData.count ?? 0;
+          }
+        } catch {
+          // Fall back: sum chunk_count from collections if available
+          totalChunks = cols.reduce(
+            (sum: number, c: { chunk_count?: number }) =>
+              sum + (c.chunk_count ?? 0),
+            0
+          );
+        }
+
         setStats({
           totalDocuments: totalDocs,
-          totalChunks: totalDocs * 12,
+          totalChunks,
           totalQueries: MOCK_RECENT_QUERIES.length,
         });
 

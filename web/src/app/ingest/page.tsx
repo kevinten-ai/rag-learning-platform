@@ -27,6 +27,9 @@ import { SimilarityHeatmap } from "@/components/vectors/SimilarityHeatmap";
 import type { ChunkResult } from "@/types/rag";
 
 interface IngestResult {
+  success: boolean;
+  document_id: string;
+  collection_id: string;
   document: {
     title: string;
     markdown: string;

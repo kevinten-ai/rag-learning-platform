@@ -109,6 +109,10 @@ function useExperiment(defaultStrategies: string[]) {
   return { state, setQuestion, toggleStrategy, setResults, setLoading };
 }
 
+const RETRIEVAL_MODE_IDS = new Set(["semantic", "keyword", "hybrid"]);
+const QUERY_ENHANCER_IDS = new Set(["rewrite", "hyde", "multi-query"]);
+const MODEL_IDS = new Set(["kimi", "glm"]);
+
 /** Call the query API with given config and return a CompareResult */
 async function runStrategyQuery(
   question: string,
@@ -117,10 +121,24 @@ async function runStrategyQuery(
 ): Promise<CompareResult> {
   const start = performance.now();
   try {
+    // Map strategy to the correct API fields
+    const apiBody: Record<string, unknown> = { question, ...extraBody };
+
+    if (RETRIEVAL_MODE_IDS.has(strategy)) {
+      apiBody.mode = strategy;
+    } else if (QUERY_ENHANCER_IDS.has(strategy)) {
+      apiBody.enhancers = [strategy];
+    } else if (MODEL_IDS.has(strategy)) {
+      apiBody.model = strategy;
+    } else {
+      // Chunking or other strategies — pass as strategy field
+      apiBody.strategy = strategy;
+    }
+
     const res = await fetch("/api/rag/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, strategy, ...extraBody }),
+      body: JSON.stringify(apiBody),
     });
     const data = await res.json();
     const durationMs = Math.round(performance.now() - start);
@@ -137,9 +155,9 @@ async function runStrategyQuery(
       ),
       durationMs,
       metrics: data.evaluation ?? {
-        relevance: 0.6 + Math.random() * 0.35,
-        faithfulness: 0.5 + Math.random() * 0.4,
-        completeness: 0.5 + Math.random() * 0.4,
+        relevance: 0,
+        faithfulness: 0,
+        completeness: 0,
       },
     };
   } catch {

@@ -21,7 +21,12 @@ export async function POST(request: NextRequest) {
     const batchResult = await batchGenerateEmbeddingsWithStats(texts, dim);
 
     // Extract raw embedding vectors for UMAP and similarity computation
-    const rawVectors = batchResult.embeddings.map((e) => e.embedding);
+    const rawVectors = batchResult.embeddings.map((e) => {
+      if (!e.embedding) {
+        throw new Error('Embedding API returned a result without an embedding vector');
+      }
+      return e.embedding;
+    });
 
     // Compute 3D UMAP projection
     const umapResult = computeUMAP3D(rawVectors);

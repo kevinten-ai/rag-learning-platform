@@ -14,7 +14,9 @@ export async function insertChunks(
 ) {
   const supabase = createServerSupabaseClient()
   const { data, error } = await supabase.from('chunks').insert(chunks).select()
-  if (error) throw error
+  if (error) {
+    throw new Error(`Failed to insert chunks into Supabase: ${error.message} (code: ${error.code})`)
+  }
   return data
 }
 
@@ -25,7 +27,9 @@ export async function getChunksByDocument(documentId: string): Promise<Chunk[]> 
     .select('*')
     .eq('document_id', documentId)
     .order('chunk_index')
-  if (error) throw error
+  if (error) {
+    throw new Error(`Failed to fetch chunks for document "${documentId}": ${error.message} (code: ${error.code})`)
+  }
   return data as Chunk[]
 }
 
@@ -40,6 +44,8 @@ export async function matchChunks(
     match_count: matchCount,
     filter_collection_id: collectionId ?? null,
   })
-  if (error) throw error
+  if (error) {
+    throw new Error(`Failed to match chunks via RPC: ${error.message} (code: ${error.code})`)
+  }
   return data
 }
