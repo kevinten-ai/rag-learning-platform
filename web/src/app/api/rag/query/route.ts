@@ -25,12 +25,19 @@ export async function POST(request: NextRequest) {
     const {
       question,
       mode = 'semantic',
-      enhancers = [] as string[],
-      model = 'kimi',
+      enhancers: rawEnhancers = [],
+      model = 'glm',
       collection_id,
       top_k = 5,
       rerank = true,
     } = body
+
+    // Normalize enhancers: accept both array ['rewrite'] and object { rewrite: true }
+    const enhancers: string[] = Array.isArray(rawEnhancers)
+      ? rawEnhancers
+      : Object.entries(rawEnhancers)
+          .filter(([, v]) => v)
+          .map(([k]) => k)
 
     if (!question || typeof question !== 'string') {
       return NextResponse.json(
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
       activeStrategies.push('hyde')
     }
 
-    if (enhancers.includes('multi-query')) {
+    if (enhancers.includes('multi-query') || enhancers.includes('multiQuery')) {
       const result = await generateMultiQuery(question)
       subQueries = result.subQueries
       activeStrategies.push('multi-query')
