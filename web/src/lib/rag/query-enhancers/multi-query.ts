@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { kimiModel } from '@/lib/llm/kimi'
+import { glmModel } from '@/lib/llm/glm'
 
 const MULTI_QUERY_PROMPT = `你是一个查询扩展专家。给定一个用户问题，请从不同角度生成 3-5 个变体查询，以提高知识库检索的召回率。
 
@@ -16,7 +16,7 @@ export async function generateMultiQuery(
   const start = Date.now()
 
   const { text } = await generateText({
-    model: kimiModel,
+    model: glmModel,
     system: MULTI_QUERY_PROMPT,
     prompt: question,
   })

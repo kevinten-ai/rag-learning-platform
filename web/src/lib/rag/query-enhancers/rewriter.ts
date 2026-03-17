@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { kimiModel } from '@/lib/llm/kimi'
+import { glmModel } from '@/lib/llm/glm'
 
 const REWRITE_PROMPT = `你是一个查询优化专家。请将用户的原始问题改写为更适合知识库检索的查询语句。
 
@@ -16,7 +16,7 @@ export async function rewriteQuery(
   const start = Date.now()
 
   const { text } = await generateText({
-    model: kimiModel,
+    model: glmModel,
     system: REWRITE_PROMPT,
     prompt: question,
   })

@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { kimiModel } from '@/lib/llm/kimi'
+import { glmModel } from '@/lib/llm/glm'
 import type { RetrievalResult, RankItem } from '@/types/rag'
 
 const RERANK_PROMPT = `你是一个文档相关性排序专家。给定一个用户问题和一组候选文档片段，请根据与问题的相关性对它们进行排序。
@@ -51,7 +51,7 @@ export async function rerankResults(
   const userPrompt = `用户问题：${question}\n\n候选文档片段：\n${candidateList}`
 
   const { text } = await generateText({
-    model: kimiModel,
+    model: glmModel,
     system: RERANK_PROMPT,
     prompt: userPrompt,
   })

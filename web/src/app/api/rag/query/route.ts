@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { streamText } from 'ai'
-import { kimiModel } from '@/lib/llm/kimi'
 import { glmModel } from '@/lib/llm/glm'
 import { RAGTracer } from '@/lib/rag/tracer'
 import { rewriteQuery } from '@/lib/rag/query-enhancers/rewriter'
@@ -156,7 +155,7 @@ export async function POST(request: NextRequest) {
 
       tracer.recordReranking({
         durationMs: rerankOutput.durationMs,
-        model: 'kimi-reranker',
+        model: 'glm-reranker',
         before: rerankOutput.before,
         after: rerankOutput.after,
         filtered: rerankOutput.filtered,
@@ -200,8 +199,8 @@ export async function POST(request: NextRequest) {
     // ----------------------------------------------------------------
     // Step 6 - Generation (streaming)
     // ----------------------------------------------------------------
-    const selectedModel = model === 'glm' ? glmModel : kimiModel
-    const modelName = model === 'glm' ? 'glm-4-flash' : 'moonshot-v1-128k'
+    const selectedModel = glmModel
+    const modelName = process.env.GLM_MODEL || 'glm-4-flash'
     const generationStart = Date.now()
 
     const result = streamText({
