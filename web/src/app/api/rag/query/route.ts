@@ -10,9 +10,12 @@ import { semanticRetrieve } from '@/lib/rag/retrievers/semantic'
 import { keywordRetrieve } from '@/lib/rag/retrievers/keyword'
 import { hybridRetrieve } from '@/lib/rag/retrievers/hybrid'
 import { rerankResults } from '@/lib/rag/reranker'
+import { assessRetrieval } from '@/lib/rag/corrective-rag'
+import { selfRAGGenerate } from '@/lib/rag/self-rag'
 import { constructPrompt } from '@/lib/rag/generator'
 import { evaluateAnswer } from '@/lib/rag/evaluator'
 import { generateEmbedding } from '@/lib/embedding/zhipu'
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server'
 import { createServerSupabaseClient } from '@/lib/supabase/client'
 import type { RetrievalResult } from '@/types/rag'
 import type { QueryRoute } from '@/lib/rag/query-router'
@@ -22,6 +25,11 @@ export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await createAuthenticatedSupabaseClient()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
 
     const {
@@ -96,6 +104,50 @@ export async function POST(request: NextRequest) {
           needsReranking: requestedRerank,
         })
       }
+    }
+
+    // ----------------------------------------------------------------
+    // no_rag shortcut: skip retrieval pipeline, answer directly
+    // ----------------------------------------------------------------
+    if (routingResult?.type === 'no_rag') {
+      const preStreamTrace = tracer.getPreStreamTrace()
+      const traceHeaderValue = Buffer.from(
+        JSON.stringify(preStreamTrace)
+      ).toString('base64')
+
+      const userId = user.id
+      const genStart = Date.now()
+
+      const result = streamText({
+        model: glmModel,
+        system: '你是一个友好的AI助手。直接回答用户的问题，不需要引用任何参考资料。',
+        prompt: question,
+        onFinish: async ({ text, usage }) => {
+          const promptTokens = usage?.inputTokens ?? 0
+          const completionTokens = usage?.outputTokens ?? 0
+          tracer.recordGeneration({
+            durationMs: Date.now() - genStart,
+            model: process.env.GLM_MODEL || 'glm-4-flash',
+            answer: text,
+            tokensUsed: { prompt: promptTokens, completion: completionTokens, total: promptTokens + completionTokens },
+            sources: [],
+            estimatedCost: estimateCost(process.env.GLM_MODEL || 'glm-4-flash', promptTokens, completionTokens),
+          })
+          try {
+            const finalTrace = tracer.finalize()
+            const supabase = createServerSupabaseClient()
+            await supabase.from('query_traces').insert({
+              id: finalTrace.id, question, config: { requestedMode: 'auto', resolvedMode: 'no_rag', model, enhancers: [], routing: routingResult },
+              trace: finalTrace, answer: text, sources: [], total_duration_ms: finalTrace.totalDurationMs,
+              total_tokens: promptTokens + completionTokens, estimated_cost: 0, user_id: userId,
+            })
+          } catch { console.error('Failed to save no_rag trace') }
+        },
+      })
+
+      return result.toTextStreamResponse({
+        headers: { 'X-RAG-Trace': traceHeaderValue },
+      })
     }
 
     // ----------------------------------------------------------------
@@ -201,6 +253,67 @@ export async function POST(request: NextRequest) {
     })
 
     // ----------------------------------------------------------------
+    // Step 3.5 - CRAG Assessment (Corrective RAG)
+    // ----------------------------------------------------------------
+    let cragRefinedQuery: string | undefined
+    let retrialPerformed = false
+
+    if (retrievalResults.length > 0) {
+      const cragStart = Date.now()
+      const originalChunkCount = retrievalResults.length
+      try {
+        const assessment = await assessRetrieval(question, retrievalResults)
+
+        if (assessment.decision === 'incorrect' && assessment.suggestedRefinement) {
+          // Re-retrieve with refined query
+          cragRefinedQuery = assessment.suggestedRefinement
+          const retryRes = await runRetrieval(cragRefinedQuery, mode, retrieveOpts)
+
+          // Merge original filtered + new results, deduplicate
+          const merged = new Map<string, RetrievalResult>()
+          for (const r of assessment.filteredChunks) merged.set(r.chunkId, r)
+          for (const r of retryRes.results) {
+            if (!merged.has(r.chunkId) || r.score > merged.get(r.chunkId)!.score) {
+              merged.set(r.chunkId, r)
+            }
+          }
+          retrievalResults = Array.from(merged.values()).sort((a, b) => b.score - a.score)
+          retrialPerformed = true
+        } else if (assessment.decision === 'ambiguous' && assessment.suggestedRefinement) {
+          // Supplement with refined query results
+          cragRefinedQuery = assessment.suggestedRefinement
+          const supplementRes = await runRetrieval(cragRefinedQuery, mode, retrieveOpts)
+
+          const merged = new Map<string, RetrievalResult>()
+          for (const r of assessment.filteredChunks) merged.set(r.chunkId, r)
+          for (const r of supplementRes.results) {
+            if (!merged.has(r.chunkId) || r.score > merged.get(r.chunkId)!.score) {
+              merged.set(r.chunkId, r)
+            }
+          }
+          retrievalResults = Array.from(merged.values()).sort((a, b) => b.score - a.score)
+          retrialPerformed = true
+        } else {
+          // Correct — use filtered chunks (may remove some low-quality ones)
+          retrievalResults = assessment.filteredChunks
+        }
+
+        tracer.recordCRAG({
+          durationMs: Date.now() - cragStart,
+          decision: assessment.decision,
+          relevanceScore: assessment.relevanceScore,
+          reasoning: assessment.reasoning,
+          refinedQuery: cragRefinedQuery,
+          originalChunkCount,
+          filteredChunkCount: assessment.filteredChunks.length,
+          retrialPerformed,
+        })
+      } catch (error) {
+        console.error('CRAG assessment failed, continuing without correction:', error)
+      }
+    }
+
+    // ----------------------------------------------------------------
     // Step 4 - Reranking (optional)
     // ----------------------------------------------------------------
     let finalResults = retrievalResults.slice(0, top_k)
@@ -260,6 +373,9 @@ export async function POST(request: NextRequest) {
     const modelName = process.env.GLM_MODEL || 'glm-4-flash'
     const generationStart = Date.now()
 
+    // Capture user.id for the onFinish callback closure
+    const userId = user.id
+
     const result = streamText({
       model: selectedModel,
       system: promptResult.systemPrompt,
@@ -297,6 +413,31 @@ export async function POST(request: NextRequest) {
           // Evaluation failure is non-critical
         }
 
+        // Self-RAG reflection (best-effort, non-blocking)
+        try {
+          const selfRagStart = Date.now()
+          const chunks = finalResults.map((r) => ({ content: r.content, chunkId: r.chunkId }))
+          const retrieveFn = async (q: string) => {
+            const res = await runRetrieval(q, mode, retrieveOpts)
+            return res.results.map((r) => ({ content: r.content }))
+          }
+          const selfRagResult = await selfRAGGenerate(question, chunks, retrieveFn)
+          tracer.recordSelfRAG({
+            durationMs: Date.now() - selfRagStart,
+            wasRevised: selfRagResult.wasRevised,
+            additionalRetrievals: selfRagResult.additionalRetrievals,
+            reflections: selfRagResult.reflections.map((r) => ({
+              paragraph: r.paragraph.slice(0, 200),
+              isRelevant: r.isRelevant,
+              isSupported: r.isSupported,
+              isComplete: r.isComplete,
+              critique: r.critique,
+            })),
+          })
+        } catch {
+          // Self-RAG failure is non-critical
+        }
+
         // Save the complete trace to Supabase (best-effort)
         try {
           const finalTrace = tracer.finalize()
@@ -321,6 +462,7 @@ export async function POST(request: NextRequest) {
             total_duration_ms: finalTrace.totalDurationMs,
             total_tokens: generation.tokensUsed.total,
             estimated_cost: generation.estimatedCost,
+            user_id: userId,
           })
         } catch {
           // Trace persistence failure is non-critical

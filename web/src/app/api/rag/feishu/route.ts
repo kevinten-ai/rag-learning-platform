@@ -2,8 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveFeishuLink } from '@/lib/feishu/link-resolver';
 import { parseFeishuBlocks } from '@/lib/feishu/parser';
 import { getDocumentContent, getDocumentMeta } from '@/lib/feishu/client';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 
 export async function POST(request: NextRequest) {
+  try {
+    const { user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   let body: { url?: string };
   try {
     body = await request.json();

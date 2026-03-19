@@ -50,22 +50,22 @@ export async function rerankResults(
 
   const userPrompt = `用户问题：${question}\n\n候选文档片段：\n${candidateList}`
 
-  const { text } = await generateText({
-    model: glmModel,
-    system: RERANK_PROMPT,
-    prompt: userPrompt,
-  })
-
-  // Parse the LLM response
   let rerankOutput: RerankOutput
   try {
+    const { text } = await generateText({
+      model: glmModel,
+      system: RERANK_PROMPT,
+      prompt: userPrompt,
+    })
+
+    // Parse the LLM response
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       throw new Error('No JSON object found in reranker response')
     }
     rerankOutput = JSON.parse(jsonMatch[0])
   } catch {
-    // Fallback: return original ordering if parsing fails
+    // Fallback: return original ordering if LLM call or parsing fails
     return {
       before,
       after: before.slice(0, topK),

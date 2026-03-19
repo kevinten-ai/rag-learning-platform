@@ -1,7 +1,8 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Download,
   BookOpen,
@@ -10,11 +11,16 @@ import {
   LayoutDashboard,
   BarChart3,
   Layers,
+  LogOut,
+  User,
 } from "lucide-react"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 
+import { createBrowserSupabaseClient } from "@/lib/supabase/client"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -22,7 +28,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -36,6 +44,42 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient()
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null)
+      }
+    )
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const handleSignOut = async () => {
+    const supabase = createBrowserSupabaseClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
+
+  const displayName = user?.is_anonymous
+    ? "Guest"
+    : user?.user_metadata?.full_name
+      || user?.user_metadata?.name
+      || user?.email
+      || "User"
+
+  const avatarUrl = user?.user_metadata?.avatar_url
 
   return (
     <Sidebar collapsible="icon">
@@ -81,6 +125,37 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarSeparator />
+        <div className="flex items-center gap-2 px-2 py-1">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Avatar"
+              className="size-7 shrink-0 rounded-full"
+            />
+          ) : (
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted">
+              <User className="size-3.5 text-muted-foreground" />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-1 flex-col group-data-[collapsible=icon]:hidden">
+            <span className="truncate text-sm font-medium">{displayName}</span>
+            {user?.is_anonymous && (
+              <span className="truncate text-xs text-muted-foreground">游客模式</span>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="shrink-0 group-data-[collapsible=icon]:hidden"
+            onClick={handleSignOut}
+            title="退出登录"
+          >
+            <LogOut className="size-3.5" />
+          </Button>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   )
 }

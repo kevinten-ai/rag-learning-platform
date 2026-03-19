@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BENCHMARK_DATASET } from '@/lib/rag/benchmark-datasets'
 import { evaluateAnswer } from '@/lib/rag/evaluator'
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server'
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await createAuthenticatedSupabaseClient()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const {
       config,
@@ -43,12 +49,15 @@ export async function POST(request: NextRequest) {
       const start = Date.now()
 
       try {
-        // Call our own query API internally
+        // Call our own query API internally (forward cookies for auth)
         const queryResponse = await fetch(
           new URL('/api/rag/query', request.url),
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Cookie: request.headers.get('cookie') ?? '',
+            },
             body: JSON.stringify({
               question: item.question,
               mode: config.retrievalMode,
@@ -60,6 +69,22 @@ export async function POST(request: NextRequest) {
         )
 
         const latencyMs = Date.now() - start
+
+        // Extract retrieved context from trace header
+        let retrievedContext = ''
+        const traceHeader = queryResponse.headers.get('X-RAG-Trace')
+        if (traceHeader) {
+          try {
+            const traceData = JSON.parse(Buffer.from(traceHeader, 'base64').toString())
+            if (traceData?.steps?.promptConstruction?.contextChunks) {
+              retrievedContext = traceData.steps.promptConstruction.contextChunks
+                .map((c: { content: string }) => c.content)
+                .join('\n\n')
+            }
+          } catch {
+            // fallback to ground truth if trace parsing fails
+          }
+        }
 
         // Read the streamed response
         const reader = queryResponse.body?.getReader()
@@ -76,11 +101,11 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Evaluate the answer
+        // Evaluate the answer against retrieved context (not ground truth)
         const evaluation = await evaluateAnswer(
           item.question,
           answer,
-          item.groundTruth
+          retrievedContext || item.groundTruth
         )
 
         // Check keyword coverage

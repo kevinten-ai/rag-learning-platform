@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { batchGenerateEmbeddingsWithStats } from '@/lib/embedding/zhipu';
 import { computeUMAP3D, computeSimilarityMatrix } from '@/lib/rag/umap';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const { texts, dimensions } = body;

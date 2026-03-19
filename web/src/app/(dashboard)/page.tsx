@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DemoModeButton } from "@/components/demo-mode";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -369,19 +370,22 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-          <Button
-            size="lg"
-            className="w-full gap-2 sm:w-auto"
-            onClick={handleQuickStart}
-            disabled={quickStartLoading}
-          >
-            {quickStartLoading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Sparkles className="size-4" />
-            )}
-            {quickStartLoading ? quickStartProgress || "处理中..." : "一键体验"}
-          </Button>
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Button
+              size="lg"
+              className="flex-1 gap-2 sm:flex-initial"
+              onClick={handleQuickStart}
+              disabled={quickStartLoading}
+            >
+              {quickStartLoading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Sparkles className="size-4" />
+              )}
+              {quickStartLoading ? quickStartProgress || "处理中..." : "一键体验"}
+            </Button>
+            <DemoModeButton />
+          </div>
         </CardContent>
       </Card>
 

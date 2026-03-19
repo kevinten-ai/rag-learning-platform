@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient();
+    const { supabase, user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const { count, error } = await supabase
       .from('chunks')
       .select('*', { count: 'exact', head: true });

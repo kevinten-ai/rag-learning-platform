@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 
 export async function GET() {
   try {
-    const supabase = createServerSupabaseClient();
+    const { supabase, user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { data, error } = await supabase
       .from('collections')
       .select('*')
@@ -52,6 +56,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const { supabase, user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const { name, description, chunk_strategy, chunk_size, chunk_overlap, embedding_dimensions } =
@@ -61,7 +70,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required field: name' }, { status: 400 });
     }
 
-    const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('collections')
       .insert({
@@ -71,6 +79,7 @@ export async function POST(request: NextRequest) {
         chunk_size: chunk_size ?? 512,
         chunk_overlap: chunk_overlap ?? 50,
         embedding_dimensions: embedding_dimensions ?? 1536,
+        user_id: user.id,
       })
       .select()
       .single();

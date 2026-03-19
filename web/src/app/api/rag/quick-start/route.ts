@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 import { SAMPLE_DOCUMENTS } from '@/lib/rag/sample-documents';
 import { recursiveChunk } from '@/lib/rag/chunkers/recursive';
 import { batchGenerateEmbeddings } from '@/lib/embedding/zhipu';
@@ -12,7 +12,10 @@ const EMBEDDING_DIMENSIONS = 1024;
 
 export async function POST() {
   try {
-    const supabase = createServerSupabaseClient();
+    const { supabase, user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     // Check if quick-start collection already exists
     const { data: existing, error: findError } = await supabase
@@ -57,6 +60,7 @@ export async function POST() {
         chunk_size: CHUNK_SIZE,
         chunk_overlap: CHUNK_OVERLAP,
         embedding_dimensions: EMBEDDING_DIMENSIONS,
+        user_id: user.id,
       })
       .select('id')
       .single();
@@ -78,6 +82,7 @@ export async function POST() {
           raw_content: sample.content,
           source_type: 'sample',
           metadata: { sample_id: sample.id },
+          user_id: user.id,
         })
         .select('id')
         .single();

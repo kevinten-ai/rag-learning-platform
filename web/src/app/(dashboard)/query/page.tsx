@@ -20,6 +20,7 @@ import {
 import { TracePanel } from "@/components/trace/TracePanel";
 import { TraceTimeline } from "@/components/trace/TraceTimeline";
 import { CostEstimator } from "@/components/trace/CostEstimator";
+import { PipelineDiagram, WaterfallChart } from "@/components/rag/pipeline-diagram";
 import { StreamingAnswer } from "@/components/generation/StreamingAnswer";
 import { SourceAttribution } from "@/components/generation/SourceAttribution";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,26 @@ export default function QueryPage() {
   const [activeStep, setActiveStep] = useState<string | null>(null);
   const [highlightedSource, setHighlightedSource] = useState<number | null>(null);
 
+  // Fetch the complete trace from DB (includes generation, evaluation, Self-RAG)
+  const fetchCompleteTrace = useCallback(async (traceId: string) => {
+    // Wait a bit for onFinish to complete and save to DB
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise((r) => setTimeout(r, 1500 + attempt * 1000));
+      try {
+        const res = await fetch(`/api/rag/trace?id=${traceId}`);
+        if (res.ok) {
+          const fullTrace = await res.json();
+          if (fullTrace?.steps?.generation) {
+            setTrace(fullTrace);
+            return;
+          }
+        }
+      } catch {
+        // retry
+      }
+    }
+  }, []);
+
   const handleQuery = useCallback(async () => {
     if (!question.trim() || isLoading) return;
 
@@ -88,10 +109,13 @@ export default function QueryPage() {
       }
 
       // Read trace from header
+      let traceId: string | null = null;
       const traceHeader = res.headers.get("X-RAG-Trace");
       if (traceHeader) {
         try {
-          setTrace(JSON.parse(atob(traceHeader)));
+          const preTrace = JSON.parse(atob(traceHeader));
+          setTrace(preTrace);
+          traceId = preTrace.id;
         } catch {
           // trace header may be invalid
         }
@@ -109,6 +133,11 @@ export default function QueryPage() {
         if (done) break;
         setAnswer((prev) => prev + decoder.decode(value));
       }
+
+      // After streaming completes, fetch the full trace (with generation, evaluation, Self-RAG)
+      if (traceId) {
+        fetchCompleteTrace(traceId);
+      }
     } catch (err) {
       console.error("Query error:", err);
       setAnswer(
@@ -118,7 +147,7 @@ export default function QueryPage() {
       setIsStreaming(false);
       setIsLoading(false);
     }
-  }, [question, mode, enhancers, isLoading]);
+  }, [question, mode, enhancers, isLoading, fetchCompleteTrace]);
 
   const handlePresetQuestion = useCallback(
     (q: string) => {
@@ -149,10 +178,13 @@ export default function QueryPage() {
               throw new Error(`Query failed: ${res.status}`);
             }
 
+            let presetTraceId: string | null = null;
             const traceHeader = res.headers.get("X-RAG-Trace");
             if (traceHeader) {
               try {
-                setTrace(JSON.parse(atob(traceHeader)));
+                const preTrace = JSON.parse(atob(traceHeader));
+                setTrace(preTrace);
+                presetTraceId = preTrace.id;
               } catch {
                 // trace header may be invalid
               }
@@ -169,6 +201,10 @@ export default function QueryPage() {
               if (done) break;
               setAnswer((prev) => prev + decoder.decode(value));
             }
+
+            if (presetTraceId) {
+              fetchCompleteTrace(presetTraceId);
+            }
           } catch (err) {
             console.error("Query error:", err);
             setAnswer(
@@ -181,7 +217,7 @@ export default function QueryPage() {
         })();
       }, 0);
     },
-    [mode, enhancers]
+    [mode, enhancers, fetchCompleteTrace]
   );
 
   const handleCitationClick = useCallback((index: number) => {
@@ -212,9 +248,11 @@ export default function QueryPage() {
         { name: "查询理解", durationMs: trace.steps.queryUnderstanding?.durationMs ?? 0 },
         { name: "向量化", durationMs: trace.steps.embedding?.durationMs ?? 0 },
         { name: "检索", durationMs: trace.steps.retrieval?.durationMs ?? 0 },
+        { name: "CRAG 校正", durationMs: trace.steps.crag?.durationMs ?? 0 },
         { name: "重排序", durationMs: trace.steps.reranking?.durationMs ?? 0 },
         { name: "Prompt 构造", durationMs: trace.steps.promptConstruction?.durationMs ?? 0 },
         { name: "LLM 生成", durationMs: trace.steps.generation?.durationMs ?? 0 },
+        { name: "Self-RAG", durationMs: trace.selfRag?.durationMs ?? 0 },
       ].filter((s) => s.durationMs > 0)
     : [];
 
@@ -364,8 +402,21 @@ export default function QueryPage() {
       <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
         {/* Left: Trace Panel */}
         <div className="space-y-4">
+          {/* Pipeline Diagram */}
+          <PipelineDiagram trace={trace ?? undefined} activeStep={activeStep ?? undefined} />
+
+          {/* Waterfall Chart */}
+          {trace && (
+            <Card>
+              <CardContent className="pt-4">
+                <WaterfallChart trace={trace ?? undefined} />
+              </CardContent>
+            </Card>
+          )}
+
           <TracePanel
             trace={trace?.steps ?? null}
+            selfRag={trace?.selfRag}
             activeStep={activeStep}
             onStepClick={setActiveStep}
             isLoading={isLoading}

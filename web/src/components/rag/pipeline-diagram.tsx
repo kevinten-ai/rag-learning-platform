@@ -99,9 +99,8 @@ interface WaterfallChartProps {
 }
 
 export function WaterfallChart({ trace }: WaterfallChartProps) {
-  if (!trace) return null;
-
   const steps = useMemo(() => {
+    if (!trace) return [];
     const entries: Array<{ id: string; label: string; durationMs: number; color: string }> = [];
     const s = trace.steps;
 
@@ -115,6 +114,8 @@ export function WaterfallChart({ trace }: WaterfallChartProps) {
 
     return entries;
   }, [trace]);
+
+  if (!trace) return null;
 
   const maxDuration = Math.max(...steps.map((s) => s.durationMs), 1);
   const totalDuration = steps.reduce((s, step) => s + step.durationMs, 0);

@@ -5,6 +5,7 @@ import { recursiveChunk } from '@/lib/rag/chunkers/recursive';
 import { semanticChunk } from '@/lib/rag/chunkers/semantic';
 import { documentAwareChunk } from '@/lib/rag/chunkers/document-aware';
 import { chunkContextual } from '@/lib/rag/chunkers/contextual';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 
 const DEFAULT_CHUNK_SIZE = 500;
 const DEFAULT_CHUNK_OVERLAP = 50;
@@ -39,6 +40,11 @@ async function runChunker(
 
 export async function POST(request: NextRequest) {
   try {
+    const { user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const { content, strategies, options } = body as {

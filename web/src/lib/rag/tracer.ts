@@ -1,5 +1,7 @@
 import { nanoid } from 'nanoid'
 import type { RAGTrace, RetrievalResult, RankItem, ContextChunk, SourceRef, QueryRoutingStep } from '@/types/rag'
+import type { CRAGAssessment } from '@/lib/rag/corrective-rag'
+import type { SelfRAGReflection } from '@/lib/rag/self-rag'
 
 /**
  * RAGTracer collects timing and data for each step of the RAG pipeline,
@@ -67,7 +69,7 @@ export class RAGTracer {
 
   recordRetrieval(data: {
     durationMs: number
-    mode: 'semantic' | 'keyword' | 'hybrid'
+    mode: 'semantic' | 'keyword' | 'hybrid' | 'sentence-window'
     totalCandidates: number
     retrieved: number
     results: RetrievalResult[]
@@ -76,6 +78,22 @@ export class RAGTracer {
     this.trace.steps = {
       ...this.trace.steps!,
       retrieval: data,
+    }
+  }
+
+  recordCRAG(data: {
+    durationMs: number
+    decision: CRAGAssessment['decision']
+    relevanceScore: number
+    reasoning: string
+    refinedQuery?: string
+    originalChunkCount: number
+    filteredChunkCount: number
+    retrialPerformed: boolean
+  }) {
+    this.trace.steps = {
+      ...this.trace.steps!,
+      crag: data,
     }
   }
 
@@ -120,6 +138,21 @@ export class RAGTracer {
     }
   }
 
+  recordSelfRAG(data: {
+    durationMs: number
+    wasRevised: boolean
+    additionalRetrievals: number
+    reflections: Array<{
+      paragraph: string
+      isRelevant: boolean
+      isSupported: boolean
+      isComplete: boolean
+      critique: string
+    }>
+  }) {
+    this.trace.selfRag = data
+  }
+
   recordEvaluation(data: {
     relevance: number
     faithfulness: number
@@ -153,6 +186,7 @@ export class RAGTracer {
         queryUnderstanding: this.trace.steps!.queryUnderstanding,
         embedding: this.trace.steps!.embedding,
         retrieval: this.trace.steps!.retrieval,
+        crag: this.trace.steps!.crag,
         reranking: this.trace.steps!.reranking,
         promptConstruction: this.trace.steps!.promptConstruction,
       } as RAGTrace['steps'],

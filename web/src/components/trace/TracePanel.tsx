@@ -14,6 +14,8 @@ import {
   ChevronDown,
   ChevronRight,
   Route,
+  ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 import {
   Bar,
@@ -30,6 +32,7 @@ import type { RAGTrace } from "@/types/rag";
 
 interface TracePanelProps {
   trace: Partial<RAGTrace["steps"]> | null;
+  selfRag?: RAGTrace["selfRag"];
   activeStep: string | null;
   onStepClick: (step: string) => void;
   isLoading?: boolean;
@@ -54,17 +57,19 @@ const STEPS: StepConfig[] = [
   { key: "queryUnderstanding", name: "查询理解", icon: Brain, color: "text-violet-500" },
   { key: "embedding", name: "向量化", icon: Binary, color: "text-blue-500" },
   { key: "retrieval", name: "检索", icon: Search, color: "text-cyan-500" },
+  { key: "crag", name: "CRAG 校正", icon: ShieldCheck, color: "text-orange-500" },
   { key: "reranking", name: "重排序", icon: ArrowUpDown, color: "text-amber-500" },
   { key: "promptConstruction", name: "Prompt 构造", icon: MessageSquare, color: "text-green-500" },
   { key: "generation", name: "LLM 生成", icon: Sparkles, color: "text-rose-500" },
+  { key: "selfRag", name: "Self-RAG 反思", icon: RefreshCw, color: "text-indigo-500" },
 ];
 
-function getVisibleSteps(trace: Partial<RAGTrace["steps"]> | null): StepConfig[] {
-  // Only show queryRouting step if it exists in the trace (auto mode was used)
+function getVisibleSteps(trace: Partial<RAGTrace["steps"]> | null, selfRag?: RAGTrace["selfRag"]): StepConfig[] {
+  // Only show optional steps if they exist in the trace
   return STEPS.filter((s) => {
-    if (s.key === "queryRouting") {
-      return trace?.queryRouting != null;
-    }
+    if (s.key === "queryRouting") return trace?.queryRouting != null;
+    if (s.key === "crag") return trace?.crag != null;
+    if (s.key === "selfRag") return selfRag != null;
     return true;
   });
 }
@@ -73,9 +78,16 @@ function getStepStatus(
   stepKey: string,
   trace: Partial<RAGTrace["steps"]> | null,
   isLoading?: boolean,
-  visibleSteps?: StepConfig[]
+  visibleSteps?: StepConfig[],
+  selfRag?: RAGTrace["selfRag"]
 ): "idle" | "running" | "completed" {
   if (!trace) return "idle";
+  // selfRag lives outside trace.steps
+  if (stepKey === "selfRag") {
+    if (selfRag) return "completed";
+    if (isLoading) return "idle"; // Self-RAG runs after generation, show idle during stream
+    return "idle";
+  }
   const stepData = trace[stepKey as keyof RAGTrace["steps"]];
   if (stepData) return "completed";
   if (isLoading) {
@@ -92,10 +104,62 @@ function getStepStatus(
 function StepDetail({
   stepKey,
   trace,
+  selfRag,
 }: {
   stepKey: string;
   trace: Partial<RAGTrace["steps"]>;
+  selfRag?: RAGTrace["selfRag"];
 }) {
+  // Self-RAG data lives outside trace.steps
+  if (stepKey === "selfRag") {
+    if (!selfRag) return null;
+    return (
+      <div className="space-y-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">修订:</span>
+          <span className={cn(
+            "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
+            selfRag.wasRevised
+              ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+              : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+          )}>
+            {selfRag.wasRevised ? "已修订答案" : "答案通过"}
+          </span>
+        </div>
+        {selfRag.additionalRetrievals > 0 && (
+          <div>
+            <span className="text-muted-foreground">额外检索: </span>
+            <span className="font-mono">{selfRag.additionalRetrievals} 次</span>
+          </div>
+        )}
+        {selfRag.reflections.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-muted-foreground">段落反思:</span>
+            {selfRag.reflections.map((r, i) => (
+              <div key={i} className="rounded bg-muted/50 p-2 space-y-1">
+                <p className="truncate text-[11px]">{r.paragraph.slice(0, 100)}{r.paragraph.length > 100 ? "..." : ""}</p>
+                <div className="flex gap-2">
+                  <span className={r.isRelevant ? "text-green-600 dark:text-green-400" : "text-red-500"}>
+                    {r.isRelevant ? "✓ 相关" : "✗ 不相关"}
+                  </span>
+                  <span className={r.isSupported ? "text-green-600 dark:text-green-400" : "text-red-500"}>
+                    {r.isSupported ? "✓ 有依据" : "✗ 无依据"}
+                  </span>
+                  <span className={r.isComplete ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}>
+                    {r.isComplete ? "✓ 完整" : "△ 不完整"}
+                  </span>
+                </div>
+                {r.critique && (
+                  <p className="text-[11px] text-muted-foreground italic">{r.critique}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const data = trace[stepKey as keyof RAGTrace["steps"]];
   if (!data) return null;
 
@@ -303,6 +367,59 @@ function StepDetail({
         </div>
       );
     }
+    case "crag": {
+      const step = data as NonNullable<RAGTrace["steps"]["crag"]>;
+      const decisionColors: Record<string, string> = {
+        correct: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+        ambiguous: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+        incorrect: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      };
+      const decisionLabels: Record<string, string> = {
+        correct: "检索正确",
+        ambiguous: "检索模糊",
+        incorrect: "检索不足",
+      };
+      return (
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">判定:</span>
+            <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium", decisionColors[step.decision] ?? "bg-muted")}>
+              {decisionLabels[step.decision] ?? step.decision}
+            </span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">相关度: </span>
+            <span className="font-mono">{(step.relevanceScore * 100).toFixed(0)}%</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">推理: </span>
+            <span>{step.reasoning}</span>
+          </div>
+          {step.refinedQuery && (
+            <div>
+              <span className="text-muted-foreground">优化查询: </span>
+              <span className="text-orange-600 dark:text-orange-400">{step.refinedQuery}</span>
+            </div>
+          )}
+          <div className="rounded bg-muted/50 p-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">原始块数</span>
+              <span className="font-mono">{step.originalChunkCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">过滤后块数</span>
+              <span className="font-mono">{step.filteredChunkCount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">重新检索</span>
+              <span className={step.retrialPerformed ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"}>
+                {step.retrialPerformed ? "是" : "否"}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
     case "promptConstruction": {
       const step = data as RAGTrace["steps"]["promptConstruction"];
       const { tokenBreakdown } = step;
@@ -392,6 +509,7 @@ function StepDetail({
 
 export function TracePanel({
   trace,
+  selfRag,
   activeStep,
   onStepClick,
   isLoading,
@@ -411,14 +529,14 @@ export function TracePanel({
     onStepClick(key);
   }
 
-  const visibleSteps = getVisibleSteps(trace);
+  const visibleSteps = getVisibleSteps(trace, selfRag);
 
   return (
     <div className="space-y-0">
       {visibleSteps.map((step, index) => {
-        const status = getStepStatus(step.key, trace, isLoading, visibleSteps);
+        const status = getStepStatus(step.key, trace, isLoading, visibleSteps, selfRag);
         const isExpanded = expandedSteps.has(step.key);
-        const stepData = trace?.[step.key as keyof RAGTrace["steps"]];
+        const stepData = step.key === "selfRag" ? selfRag : trace?.[step.key as keyof RAGTrace["steps"]];
         const durationMs = stepData
           ? (stepData as { durationMs?: number }).durationMs
           : undefined;
@@ -489,7 +607,7 @@ export function TracePanel({
                 {/* Expanded details */}
                 {isExpanded && trace && (
                   <div className="mt-3 border-t pt-3">
-                    <StepDetail stepKey={step.key} trace={trace} />
+                    <StepDetail stepKey={step.key} trace={trace} selfRag={selfRag} />
                   </div>
                 )}
               </CardContent>

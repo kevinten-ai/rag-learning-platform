@@ -8,7 +8,7 @@ import { documentAwareChunk } from '@/lib/rag/chunkers/document-aware';
 import { chunkContextual } from '@/lib/rag/chunkers/contextual';
 import { batchGenerateEmbeddingsWithStats } from '@/lib/embedding/zhipu';
 import { computeUMAP3D, computeSimilarityMatrix } from '@/lib/rag/umap';
-import { createServerSupabaseClient } from '@/lib/supabase/client';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 import { insertChunks } from '@/lib/supabase/vectors';
 
 const chunkerMap: Record<string, (content: string, options: { chunkSize: number; chunkOverlap: number }) => import('@/types/rag').ChunkResult[] | Promise<import('@/types/rag').ChunkResult[]>> = {
@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
+    const { supabase, user } = await createAuthenticatedSupabaseClient();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { url, content, title, source_type, collection_id, chunk_strategy = 'recursive', chunk_size = 500, chunk_overlap = 50, embedding_dimensions = 1024 } = body;
 
@@ -139,7 +144,6 @@ export async function POST(request: NextRequest) {
 
     // Stage 7: Store in Supabase
     stageStart = Date.now();
-    const supabase = createServerSupabaseClient();
 
     // Ensure collection exists
     let collectionId = collection_id;
@@ -152,6 +156,7 @@ export async function POST(request: NextRequest) {
           chunk_size,
           chunk_overlap,
           embedding_dimensions,
+          user_id: user.id,
         })
         .select('id')
         .single();
@@ -172,6 +177,7 @@ export async function POST(request: NextRequest) {
         raw_content: parsed.markdown,
         metadata: meta,
         token_count: chunks.reduce((sum, c) => sum + c.tokenCount, 0),
+        user_id: user.id,
       })
       .select('id')
       .single();
