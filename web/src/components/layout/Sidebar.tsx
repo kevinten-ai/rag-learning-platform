@@ -8,6 +8,8 @@ import {
   Search,
   FlaskConical,
   LayoutDashboard,
+  BarChart3,
+  Layers,
 } from "lucide-react"
 
 import {
@@ -28,6 +30,8 @@ const navItems = [
   { href: "/knowledge", label: "知识库", icon: BookOpen },
   { href: "/query", label: "RAG 问答", icon: Search },
   { href: "/lab", label: "策略实验室", icon: FlaskConical },
+  { href: "/benchmark", label: "基准测试", icon: BarChart3 },
+  { href: "/techniques", label: "技术目录", icon: Layers },
 ]
 
 export function AppSidebar() {

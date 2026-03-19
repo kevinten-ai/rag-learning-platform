@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import type { RAGTrace, RetrievalResult, RankItem, ContextChunk, SourceRef } from '@/types/rag'
+import type { RAGTrace, RetrievalResult, RankItem, ContextChunk, SourceRef, QueryRoutingStep } from '@/types/rag'
 
 /**
  * RAGTracer collects timing and data for each step of the RAG pipeline,
@@ -26,6 +26,13 @@ export class RAGTracer {
 
   get id() {
     return this.traceId
+  }
+
+  recordQueryRouting(data: QueryRoutingStep) {
+    this.trace.steps = {
+      ...this.trace.steps!,
+      queryRouting: data,
+    }
   }
 
   recordQueryUnderstanding(data: {
@@ -142,6 +149,7 @@ export class RAGTracer {
       timestamp: this.trace.timestamp!,
       totalDurationMs: Date.now() - this.startTime,
       steps: {
+        queryRouting: this.trace.steps!.queryRouting,
         queryUnderstanding: this.trace.steps!.queryUnderstanding,
         embedding: this.trace.steps!.embedding,
         retrieval: this.trace.steps!.retrieval,

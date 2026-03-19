@@ -14,7 +14,33 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ collections: data ?? [] });
+    const collections = data ?? [];
+
+    // Compute document_count per collection by querying the documents table
+    if (collections.length > 0) {
+      const collectionIds = collections.map((c) => c.id);
+      const { data: docs } = await supabase
+        .from('documents')
+        .select('collection_id')
+        .in('collection_id', collectionIds);
+
+      const countMap: Record<string, number> = {};
+      if (docs) {
+        for (const doc of docs) {
+          countMap[doc.collection_id] = (countMap[doc.collection_id] ?? 0) + 1;
+        }
+      }
+
+      for (const col of collections) {
+        col.document_count = countMap[col.id] ?? 0;
+        // Provide updated_at fallback for clients that expect it
+        if (!col.updated_at) {
+          col.updated_at = col.created_at;
+        }
+      }
+    }
+
+    return NextResponse.json({ collections });
   } catch (error) {
     console.error('Collections GET error:', error);
     return NextResponse.json(

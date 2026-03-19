@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { streamText } from 'ai'
 import { glmModel } from '@/lib/llm/glm'
 import { RAGTracer } from '@/lib/rag/tracer'
+import { routeQuery } from '@/lib/rag/query-router'
 import { rewriteQuery } from '@/lib/rag/query-enhancers/rewriter'
 import { generateHyDE } from '@/lib/rag/query-enhancers/hyde'
 import { generateMultiQuery } from '@/lib/rag/query-enhancers/multi-query'
@@ -14,6 +15,7 @@ import { evaluateAnswer } from '@/lib/rag/evaluator'
 import { generateEmbedding } from '@/lib/embedding/zhipu'
 import { createServerSupabaseClient } from '@/lib/supabase/client'
 import type { RetrievalResult } from '@/types/rag'
+import type { QueryRoute } from '@/lib/rag/query-router'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -24,16 +26,16 @@ export async function POST(request: NextRequest) {
 
     const {
       question,
-      mode = 'semantic',
+      mode: requestedMode = 'auto',
       enhancers: rawEnhancers = [],
       model = 'glm',
       collection_id,
-      top_k = 5,
-      rerank = true,
+      top_k: requestedTopK = 5,
+      rerank: requestedRerank = true,
     } = body
 
     // Normalize enhancers: accept both array ['rewrite'] and object { rewrite: true }
-    const enhancers: string[] = Array.isArray(rawEnhancers)
+    let enhancers: string[] = Array.isArray(rawEnhancers)
       ? rawEnhancers
       : Object.entries(rawEnhancers)
           .filter(([, v]) => v)
@@ -47,6 +49,54 @@ export async function POST(request: NextRequest) {
     }
 
     const tracer = new RAGTracer(question)
+
+    // ----------------------------------------------------------------
+    // Step 0 - Query Routing (auto mode)
+    // ----------------------------------------------------------------
+    let mode: string = requestedMode
+    let top_k = requestedTopK
+    let rerank = requestedRerank
+    let routingResult: QueryRoute | null = null
+
+    if (requestedMode === 'auto') {
+      const routeStart = Date.now()
+      try {
+        routingResult = await routeQuery(question)
+        const routeDurationMs = Date.now() - routeStart
+
+        // Apply router suggestions
+        mode = routingResult.suggestedRetrieval
+        top_k = routingResult.suggestedTopK
+        rerank = routingResult.needsReranking
+        enhancers = routingResult.suggestedEnhancers
+
+        tracer.recordQueryRouting({
+          durationMs: routeDurationMs,
+          type: routingResult.type,
+          reasoning: routingResult.reasoning,
+          suggestedEnhancers: routingResult.suggestedEnhancers,
+          suggestedRetrieval: routingResult.suggestedRetrieval,
+          suggestedTopK: routingResult.suggestedTopK,
+          needsReranking: routingResult.needsReranking,
+        })
+      } catch (error) {
+        // If routing fails, fall back to semantic mode with defaults
+        console.error('Query routing failed, falling back to semantic:', error)
+        mode = 'semantic'
+        top_k = requestedTopK
+        rerank = requestedRerank
+
+        tracer.recordQueryRouting({
+          durationMs: Date.now() - routeStart,
+          type: 'simple',
+          reasoning: '路由失败，回退到默认语义检索策略',
+          suggestedEnhancers: [],
+          suggestedRetrieval: 'semantic',
+          suggestedTopK: requestedTopK,
+          needsReranking: requestedRerank,
+        })
+      }
+    }
 
     // ----------------------------------------------------------------
     // Step 1 - Query Understanding
@@ -256,12 +306,14 @@ export async function POST(request: NextRequest) {
             id: finalTrace.id,
             question: finalTrace.question,
             config: {
-              mode,
+              requestedMode: requestedMode,
+              resolvedMode: mode,
               model,
               enhancers,
               top_k,
               rerank,
               collection_id,
+              routing: routingResult,
             },
             trace: finalTrace,
             answer: generation.answer,

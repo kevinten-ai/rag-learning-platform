@@ -84,42 +84,6 @@ const quickActions = [
   },
 ];
 
-// Mock recent queries (in production this would come from query_traces)
-const MOCK_RECENT_QUERIES: RecentQuery[] = [
-  {
-    id: "q-001",
-    question: "如何配置飞书 API 的权限？",
-    answer_preview: "飞书 API 权限配置需要在飞书开放平台后台进行...",
-    mode: "hybrid",
-    duration_ms: 1405,
-    timestamp: "2026-03-16T08:30:00Z",
-  },
-  {
-    id: "q-002",
-    question: "RAG 系统中向量检索的原理是什么？",
-    answer_preview: "向量检索的核心原理是将文本转换为高维向量...",
-    mode: "semantic",
-    duration_ms: 980,
-    timestamp: "2026-03-16T07:15:00Z",
-  },
-  {
-    id: "q-003",
-    question: "Elasticsearch 和向量数据库有什么区别？",
-    answer_preview: "Elasticsearch 传统上是全文搜索引擎，但近年来也支持了向量检索...",
-    mode: "hybrid",
-    duration_ms: 1230,
-    timestamp: "2026-03-15T16:45:00Z",
-  },
-  {
-    id: "q-004",
-    question: "如何优化分块策略以提高检索质量？",
-    answer_preview: "分块策略的优化需要考虑多个因素：分块大小、重叠度、分割方式...",
-    mode: "semantic",
-    duration_ms: 1150,
-    timestamp: "2026-03-15T14:20:00Z",
-  },
-];
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -247,7 +211,7 @@ function RecentQueries({
         ) : queries.length === 0 ? (
           <div className="flex h-32 flex-col items-center justify-center text-sm text-muted-foreground">
             <MessageSquare className="mb-2 size-8" />
-            <p>暂无查询记录</p>
+            <p>暂无查询记录，试试一键体验！</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -320,25 +284,26 @@ export default function DashboardPage() {
     async function fetchDashboardData() {
       setIsLoading(true);
       try {
-        const res = await fetch("/api/rag/collections");
-        const data = await res.json();
-        const cols = data.collections ?? [];
+        // Fetch collections, chunk count, and recent queries in parallel
+        const [collectionsRes, chunksRes, queriesRes] = await Promise.all([
+          fetch("/api/rag/collections"),
+          fetch("/api/rag/collections/chunks-count").catch(() => null),
+          fetch("/api/rag/recent-queries").catch(() => null),
+        ]);
+
+        const collectionsData = await collectionsRes.json();
+        const cols = collectionsData.collections ?? [];
         const totalDocs = cols.reduce(
           (sum: number, c: { document_count?: number }) =>
             sum + (c.document_count ?? 0),
           0
         );
 
-        // Fetch actual chunk count from Supabase via the collections endpoint
         let totalChunks = 0;
-        try {
-          const chunksRes = await fetch("/api/rag/collections/chunks-count");
-          if (chunksRes.ok) {
-            const chunksData = await chunksRes.json();
-            totalChunks = chunksData.count ?? 0;
-          }
-        } catch {
-          // Fall back: sum chunk_count from collections if available
+        if (chunksRes && chunksRes.ok) {
+          const chunksData = await chunksRes.json();
+          totalChunks = chunksData.count ?? 0;
+        } else {
           totalChunks = cols.reduce(
             (sum: number, c: { chunk_count?: number }) =>
               sum + (c.chunk_count ?? 0),
@@ -346,14 +311,21 @@ export default function DashboardPage() {
           );
         }
 
+        let queries: RecentQuery[] = [];
+        let totalQueries = 0;
+        if (queriesRes && queriesRes.ok) {
+          const queriesData = await queriesRes.json();
+          queries = queriesData.queries ?? [];
+          totalQueries = queriesData.totalCount ?? queries.length;
+        }
+
         setStats({
           totalDocuments: totalDocs,
           totalChunks,
-          totalQueries: MOCK_RECENT_QUERIES.length,
+          totalQueries,
         });
 
-        // In production, fetch from /api/rag/query-traces or similar
-        setRecentQueries(MOCK_RECENT_QUERIES);
+        setRecentQueries(queries);
       } catch {
         setStats(null);
         setRecentQueries([]);

@@ -49,3 +49,31 @@ export async function matchChunks(
   }
   return data
 }
+
+export async function getChunkNeighbors(
+  chunkId: string,
+  windowSize: number = 1
+): Promise<Array<{ id: string; content: string; chunk_index: number; document_id: string }>> {
+  const supabase = createServerSupabaseClient()
+
+  // First get the target chunk's index and document_id
+  const { data: target, error: targetError } = await supabase
+    .from('chunks')
+    .select('chunk_index, document_id')
+    .eq('id', chunkId)
+    .single()
+
+  if (targetError || !target) return []
+
+  // Fetch surrounding chunks from the same document
+  const { data, error } = await supabase
+    .from('chunks')
+    .select('id, content, chunk_index, document_id')
+    .eq('document_id', target.document_id)
+    .gte('chunk_index', target.chunk_index - windowSize)
+    .lte('chunk_index', target.chunk_index + windowSize)
+    .order('chunk_index')
+
+  if (error) return []
+  return data ?? []
+}

@@ -1,16 +1,90 @@
 "use client";
 
+import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { parseCitations } from "@/lib/rag/citation-generator";
 
 interface StreamingAnswerProps {
   content: string;
   isStreaming: boolean;
+  onCitationClick?: (index: number) => void;
 }
 
-export function StreamingAnswer({ content, isStreaming }: StreamingAnswerProps) {
+/**
+ * Renders inline citation badges within a text string.
+ * Parses [1], [2], etc. and renders them as clickable blue pills.
+ */
+function renderTextWithCitations(
+  text: string,
+  onCitationClick?: (index: number) => void
+): React.ReactNode[] {
+  const parts = parseCitations(text);
+  return parts.map((part, i) => {
+    if (part.type === "citation" && part.index !== undefined) {
+      return (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onCitationClick?.(part.index!)}
+          className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-blue-600 bg-blue-100 rounded-full cursor-pointer hover:bg-blue-200 transition-colors mx-0.5 align-super"
+          title={`跳转到参考资料 ${part.index}`}
+        >
+          {part.index}
+        </button>
+      );
+    }
+    return <React.Fragment key={i}>{part.content}</React.Fragment>;
+  });
+}
+
+/**
+ * Custom ReactMarkdown components that intercept text nodes
+ * and render citation markers as interactive badges.
+ */
+function createCitationComponents(
+  onCitationClick?: (index: number) => void
+): Record<string, React.ComponentType<Record<string, unknown>>> {
+  // Helper that wraps children, replacing any string children with citation-aware rendering
+  function wrapChildren(children: React.ReactNode): React.ReactNode {
+    return React.Children.map(children, (child) => {
+      if (typeof child === "string") {
+        const rendered = renderTextWithCitations(child, onCitationClick);
+        // If no citations were found, return the original string
+        if (rendered.length === 1 && rendered[0] === child) return child;
+        return <>{rendered}</>;
+      }
+      return child;
+    });
+  }
+
+  return {
+    // Override paragraph to handle citations within text
+    p: ({ children, ...props }: { children?: React.ReactNode;[key: string]: unknown }) => (
+      <p {...props}>{wrapChildren(children)}</p>
+    ),
+    // Override list item
+    li: ({ children, ...props }: { children?: React.ReactNode;[key: string]: unknown }) => (
+      <li {...props}>{wrapChildren(children)}</li>
+    ),
+    // Override strong/bold
+    strong: ({ children, ...props }: { children?: React.ReactNode;[key: string]: unknown }) => (
+      <strong {...props}>{wrapChildren(children)}</strong>
+    ),
+    // Override emphasis/italic
+    em: ({ children, ...props }: { children?: React.ReactNode;[key: string]: unknown }) => (
+      <em {...props}>{wrapChildren(children)}</em>
+    ),
+    // Override table cells
+    td: ({ children, ...props }: { children?: React.ReactNode;[key: string]: unknown }) => (
+      <td {...props}>{wrapChildren(children)}</td>
+    ),
+  } as Record<string, React.ComponentType<Record<string, unknown>>>;
+}
+
+export function StreamingAnswer({ content, isStreaming, onCitationClick }: StreamingAnswerProps) {
   if (!content && !isStreaming) {
     return (
       <Card>
@@ -25,6 +99,8 @@ export function StreamingAnswer({ content, isStreaming }: StreamingAnswerProps) 
       </Card>
     );
   }
+
+  const citationComponents = createCitationComponents(onCitationClick);
 
   return (
     <Card>
@@ -54,7 +130,10 @@ export function StreamingAnswer({ content, isStreaming }: StreamingAnswerProps) 
             "prose-td:border prose-td:border-border prose-td:px-3 prose-td:py-1.5"
           )}
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={citationComponents}
+          >
             {content}
           </ReactMarkdown>
           {isStreaming && (

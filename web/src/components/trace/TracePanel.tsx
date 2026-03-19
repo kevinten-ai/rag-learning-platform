@@ -13,6 +13,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Route,
 } from "lucide-react";
 import {
   Bar,
@@ -41,7 +42,15 @@ interface StepConfig {
   color: string;
 }
 
+const QUERY_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  simple: { label: "简单查询", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+  analytical: { label: "分析性问题", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  comparison: { label: "对比性问题", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+  no_rag: { label: "无需检索", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400" },
+};
+
 const STEPS: StepConfig[] = [
+  { key: "queryRouting", name: "智能路由", icon: Route, color: "text-pink-500" },
   { key: "queryUnderstanding", name: "查询理解", icon: Brain, color: "text-violet-500" },
   { key: "embedding", name: "向量化", icon: Binary, color: "text-blue-500" },
   { key: "retrieval", name: "检索", icon: Search, color: "text-cyan-500" },
@@ -50,17 +59,29 @@ const STEPS: StepConfig[] = [
   { key: "generation", name: "LLM 生成", icon: Sparkles, color: "text-rose-500" },
 ];
 
+function getVisibleSteps(trace: Partial<RAGTrace["steps"]> | null): StepConfig[] {
+  // Only show queryRouting step if it exists in the trace (auto mode was used)
+  return STEPS.filter((s) => {
+    if (s.key === "queryRouting") {
+      return trace?.queryRouting != null;
+    }
+    return true;
+  });
+}
+
 function getStepStatus(
   stepKey: string,
   trace: Partial<RAGTrace["steps"]> | null,
-  isLoading?: boolean
+  isLoading?: boolean,
+  visibleSteps?: StepConfig[]
 ): "idle" | "running" | "completed" {
   if (!trace) return "idle";
   const stepData = trace[stepKey as keyof RAGTrace["steps"]];
   if (stepData) return "completed";
   if (isLoading) {
-    const stepIndex = STEPS.findIndex((s) => s.key === stepKey);
-    const completedCount = STEPS.filter(
+    const steps = visibleSteps ?? STEPS;
+    const stepIndex = steps.findIndex((s) => s.key === stepKey);
+    const completedCount = steps.filter(
       (s) => trace[s.key as keyof RAGTrace["steps"]]
     ).length;
     if (stepIndex === completedCount) return "running";
@@ -79,6 +100,50 @@ function StepDetail({
   if (!data) return null;
 
   switch (stepKey) {
+    case "queryRouting": {
+      const step = data as NonNullable<RAGTrace["steps"]["queryRouting"]>;
+      const typeInfo = QUERY_TYPE_LABELS[step.type] ?? { label: step.type, color: "bg-muted text-muted-foreground" };
+      return (
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">分类:</span>
+            <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium", typeInfo.color)}>
+              {typeInfo.label}
+            </span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">推理: </span>
+            <span>{step.reasoning}</span>
+          </div>
+          <div className="rounded bg-muted/50 p-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">检索模式</span>
+              <Badge variant="outline">{step.suggestedRetrieval}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Top K</span>
+              <span className="font-mono">{step.suggestedTopK}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">重排序</span>
+              <span className={step.needsReranking ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}>
+                {step.needsReranking ? "启用" : "关闭"}
+              </span>
+            </div>
+            {step.suggestedEnhancers.length > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">增强器</span>
+                <div className="flex gap-1">
+                  {step.suggestedEnhancers.map((e) => (
+                    <Badge key={e} variant="secondary">{e}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
     case "queryUnderstanding": {
       const step = data as RAGTrace["steps"]["queryUnderstanding"];
       return (
@@ -346,17 +411,19 @@ export function TracePanel({
     onStepClick(key);
   }
 
+  const visibleSteps = getVisibleSteps(trace);
+
   return (
     <div className="space-y-0">
-      {STEPS.map((step, index) => {
-        const status = getStepStatus(step.key, trace, isLoading);
+      {visibleSteps.map((step, index) => {
+        const status = getStepStatus(step.key, trace, isLoading, visibleSteps);
         const isExpanded = expandedSteps.has(step.key);
         const stepData = trace?.[step.key as keyof RAGTrace["steps"]];
         const durationMs = stepData
           ? (stepData as { durationMs?: number }).durationMs
           : undefined;
         const Icon = step.icon;
-        const isLast = index === STEPS.length - 1;
+        const isLast = index === visibleSteps.length - 1;
 
         return (
           <div key={step.key} className="relative flex gap-3">

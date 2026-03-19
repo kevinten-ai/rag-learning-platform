@@ -43,6 +43,7 @@ const CHUNKING_STRATEGIES: StrategyOption[] = [
   { id: "recursive", label: "递归字符", description: "按分隔符递归切分" },
   { id: "semantic", label: "语义分块", description: "按语义边界分块" },
   { id: "document-aware", label: "文档结构", description: "按标题/段落结构分块" },
+  { id: "contextual", label: "上下文增强", description: "LLM 生成上下文前缀，提升检索质量" },
 ];
 
 const RETRIEVAL_STRATEGIES: StrategyOption[] = [

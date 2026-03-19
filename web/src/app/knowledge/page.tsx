@@ -36,7 +36,7 @@ interface CollectionData {
   embedding_dimensions: number;
   document_count: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 interface StatsData {
@@ -204,7 +204,7 @@ function CollectionCards({
               <div className="text-muted-foreground">向量维度</div>
               <div className="font-medium">{col.embedding_dimensions}</div>
               <div className="text-muted-foreground">更新时间</div>
-              <div className="font-medium">{formatDate(col.updated_at)}</div>
+              <div className="font-medium">{formatDate(col.updated_at ?? col.created_at)}</div>
             </div>
           </CardContent>
         </Card>
@@ -319,7 +319,7 @@ export default function KnowledgePage() {
       const totalDocs = cols.reduce((sum, c) => sum + (c.document_count ?? 0), 0);
       const latestUpdated = cols.length > 0
         ? cols
-            .map((c) => c.updated_at)
+            .map((c) => c.updated_at ?? c.created_at)
             .sort()
             .reverse()[0]
         : "";
@@ -349,19 +349,18 @@ export default function KnowledgePage() {
         lastUpdated: latestUpdated,
       });
 
-      // Simulate document list from collections (placeholder for Supabase)
-      const mockDocs: DocumentItem[] = cols.flatMap((col) =>
-        Array.from({ length: Math.min(col.document_count, 5) }, (_, i) => ({
-          id: `${col.id}-doc-${i}`,
-          title: `${col.name} - 文档 ${i + 1}`,
-          source_type: "feishu",
-          chunk_count: 8 + Math.floor(Math.random() * 20),
-          token_count: 2000 + Math.floor(Math.random() * 8000),
-          created_at: col.created_at,
-          status: "ready" as const,
-        }))
-      );
-      setDocuments(mockDocs);
+      // Fetch real documents from Supabase
+      try {
+        const docsRes = await fetch("/api/rag/documents");
+        if (docsRes.ok) {
+          const docsData = await docsRes.json();
+          setDocuments(docsData.documents ?? []);
+        } else {
+          setDocuments([]);
+        }
+      } catch {
+        setDocuments([]);
+      }
     } catch {
       setStats(null);
       setCollections([]);

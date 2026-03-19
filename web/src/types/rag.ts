@@ -1,9 +1,20 @@
+export interface QueryRoutingStep {
+  durationMs: number;
+  type: 'simple' | 'analytical' | 'comparison' | 'no_rag';
+  reasoning: string;
+  suggestedEnhancers: string[];
+  suggestedRetrieval: 'semantic' | 'keyword' | 'hybrid';
+  suggestedTopK: number;
+  needsReranking: boolean;
+}
+
 export interface RAGTrace {
   id: string;
   question: string;
   timestamp: string;
   totalDurationMs: number;
   steps: {
+    queryRouting?: QueryRoutingStep;
     queryUnderstanding: {
       durationMs: number;
       original: string;
@@ -22,7 +33,7 @@ export interface RAGTrace {
     };
     retrieval: {
       durationMs: number;
-      mode: 'semantic' | 'keyword' | 'hybrid';
+      mode: 'semantic' | 'keyword' | 'hybrid' | 'sentence-window';
       totalCandidates: number;
       retrieved: number;
       results: RetrievalResult[];
@@ -34,6 +45,22 @@ export interface RAGTrace {
       before: RankItem[];
       after: RankItem[];
       filtered: string[];
+    };
+    crag?: {
+      durationMs: number;
+      decision: 'correct' | 'ambiguous' | 'incorrect';
+      relevanceScore: number;
+      reasoning: string;
+      refinedQuery?: string;
+      originalChunkCount: number;
+      filteredChunkCount: number;
+      retrialPerformed: boolean;
+    };
+    queryDecomposition?: {
+      durationMs: number;
+      isComplex: boolean;
+      subQuestions: Array<{ question: string; dependsOn: number[] }>;
+      synthesisStrategy: 'merge' | 'compare' | 'sequential';
     };
     promptConstruction: {
       durationMs: number;
@@ -51,6 +78,18 @@ export interface RAGTrace {
       sources: SourceRef[];
       estimatedCost: number;
     };
+  };
+  selfRag?: {
+    durationMs: number;
+    wasRevised: boolean;
+    additionalRetrievals: number;
+    reflections: Array<{
+      paragraph: string;
+      isRelevant: boolean;
+      isSupported: boolean;
+      isComplete: boolean;
+      critique: string;
+    }>;
   };
   evaluation?: {
     relevance: number;
@@ -99,6 +138,7 @@ export interface ChunkResult {
     headingPath?: string[];
     overlapBefore?: string;
     overlapAfter?: string;
+    contextPrefix?: string;
   };
 }
 

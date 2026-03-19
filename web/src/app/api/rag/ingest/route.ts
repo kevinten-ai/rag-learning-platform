@@ -5,6 +5,7 @@ import { parseFeishuBlocks } from '@/lib/feishu/parser';
 import { recursiveChunk } from '@/lib/rag/chunkers/recursive';
 import { fixedSizeChunk } from '@/lib/rag/chunkers/fixed-size';
 import { documentAwareChunk } from '@/lib/rag/chunkers/document-aware';
+import { chunkContextual } from '@/lib/rag/chunkers/contextual';
 import { batchGenerateEmbeddingsWithStats } from '@/lib/embedding/zhipu';
 import { computeUMAP3D, computeSimilarityMatrix } from '@/lib/rag/umap';
 import { createServerSupabaseClient } from '@/lib/supabase/client';
@@ -14,6 +15,7 @@ const chunkerMap: Record<string, (content: string, options: { chunkSize: number;
   'recursive': recursiveChunk,
   'fixed-size': fixedSizeChunk,
   'document-aware': documentAwareChunk,
+  'contextual': chunkContextual,
 };
 
 export async function POST(request: NextRequest) {

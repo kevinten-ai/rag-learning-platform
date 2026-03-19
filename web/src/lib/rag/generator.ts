@@ -1,12 +1,12 @@
 import type { RetrievalResult, ContextChunk, RankItem } from '@/types/rag'
 
-const SYSTEM_TEMPLATE = `你是一个基于知识库的智能问答助手。请根据提供的参考文档片段来回答用户的问题。
+const SYSTEM_TEMPLATE = `你是一个基于知识库的问答助手。根据提供的参考资料回答用户问题。
 
 要求：
-1. 基于给定的参考内容进行回答，不要编造信息
-2. 如果参考内容不足以回答问题，请明确说明
-3. 在回答中引用相关的文档来源
-4. 使用清晰、结构化的方式组织回答
+1. 必须在回答中使用 [1]、[2] 等标注引用了哪些参考资料
+2. 每个关键论点都必须有引用标注
+3. 如果参考资料不足以回答问题，明确说明
+4. 保持回答准确、简洁、有理有据
 5. 如果问题涉及多个方面，请分点回答`
 
 /**
@@ -47,10 +47,11 @@ export function constructPrompt(
   }))
 
   // Build the context section of the prompt
+  // Number each chunk with [1], [2], etc. so the model can cite them
   const contextSection = contextChunks
     .map(
       (chunk, i) =>
-        `【参考文档 ${i + 1}】（来源：${chunk.source}）\n${chunk.content}`
+        `[${i + 1}]（来源：${chunk.source}）\n${chunk.content}`
     )
     .join('\n\n')
 

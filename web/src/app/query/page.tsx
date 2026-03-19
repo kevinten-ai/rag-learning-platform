@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { PRESET_QUESTIONS } from "@/lib/rag/sample-documents";
 import type { RAGTrace } from "@/types/rag";
 
-type SearchMode = "semantic" | "keyword" | "hybrid";
+type SearchMode = "auto" | "semantic" | "keyword" | "hybrid";
 
 interface Enhancers {
   rewrite: boolean;
@@ -35,6 +35,7 @@ interface Enhancers {
 }
 
 const MODE_OPTIONS: { value: SearchMode; label: string }[] = [
+  { value: "auto", label: "Auto (智能路由)" },
   { value: "semantic", label: "语义检索" },
   { value: "keyword", label: "关键词检索" },
   { value: "hybrid", label: "混合检索" },
@@ -48,7 +49,7 @@ const ENHANCER_OPTIONS: { key: keyof Enhancers; label: string }[] = [
 
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
-  const [mode, setMode] = useState<SearchMode>("hybrid");
+  const [mode, setMode] = useState<SearchMode>("auto");
   const [enhancers, setEnhancers] = useState<Enhancers>({
     rewrite: true,
     hyde: false,
@@ -60,6 +61,7 @@ export default function QueryPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null);
+  const [highlightedSource, setHighlightedSource] = useState<number | null>(null);
 
   const handleQuery = useCallback(async () => {
     if (!question.trim() || isLoading) return;
@@ -182,6 +184,13 @@ export default function QueryPage() {
     [mode, enhancers]
   );
 
+  const handleCitationClick = useCallback((index: number) => {
+    // Update highlighted source to trigger scroll + highlight in SourceAttribution
+    setHighlightedSource(null);
+    // Use a microtask to ensure state clears before re-setting (so effect re-fires for same index)
+    setTimeout(() => setHighlightedSource(index), 0);
+  }, []);
+
   function handleReset() {
     setQuestion("");
     setAnswer("");
@@ -189,6 +198,7 @@ export default function QueryPage() {
     setIsLoading(false);
     setIsStreaming(false);
     setActiveStep(null);
+    setHighlightedSource(null);
   }
 
   function toggleEnhancer(key: keyof Enhancers) {
@@ -198,6 +208,7 @@ export default function QueryPage() {
   // Build timeline data from trace
   const timelineSteps = trace
     ? [
+        { name: "智能路由", durationMs: trace.steps.queryRouting?.durationMs ?? 0 },
         { name: "查询理解", durationMs: trace.steps.queryUnderstanding?.durationMs ?? 0 },
         { name: "向量化", durationMs: trace.steps.embedding?.durationMs ?? 0 },
         { name: "检索", durationMs: trace.steps.retrieval?.durationMs ?? 0 },
@@ -279,32 +290,41 @@ export default function QueryPage() {
               ))}
             </div>
 
-            {/* Enhancer checkboxes */}
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground">增强:</span>
-              {ENHANCER_OPTIONS.map((opt) => (
-                <label
-                  key={opt.key}
-                  className="flex cursor-pointer items-center gap-1.5 text-xs"
-                >
-                  <input
-                    type="checkbox"
-                    checked={enhancers[opt.key]}
-                    onChange={() => toggleEnhancer(opt.key)}
-                    className="size-3.5 rounded border-border accent-primary"
-                  />
-                  <span
-                    className={cn(
-                      enhancers[opt.key]
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    )}
+            {/* Auto mode indicator */}
+            {mode === "auto" && (
+              <span className="text-xs italic text-muted-foreground">
+                AI 将自动选择最佳检索策略
+              </span>
+            )}
+
+            {/* Enhancer checkboxes (disabled in auto mode) */}
+            {mode !== "auto" && (
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">增强:</span>
+                {ENHANCER_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.key}
+                    className="flex cursor-pointer items-center gap-1.5 text-xs"
                   >
-                    {opt.label}
-                  </span>
-                </label>
-              ))}
-            </div>
+                    <input
+                      type="checkbox"
+                      checked={enhancers[opt.key]}
+                      onChange={() => toggleEnhancer(opt.key)}
+                      className="size-3.5 rounded border-border accent-primary"
+                    />
+                    <span
+                      className={cn(
+                        enhancers[opt.key]
+                          ? "text-foreground"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {opt.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Preset question pills — shown when input is empty and no answer */}
@@ -363,11 +383,11 @@ export default function QueryPage() {
         {/* Right: Answer + Sources + Quality */}
         <div className="space-y-4">
           {/* Streaming answer */}
-          <StreamingAnswer content={answer} isStreaming={isStreaming} />
+          <StreamingAnswer content={answer} isStreaming={isStreaming} onCitationClick={handleCitationClick} />
 
           {/* Source attribution */}
           {trace?.steps.generation?.sources && (
-            <SourceAttribution sources={trace.steps.generation.sources} />
+            <SourceAttribution sources={trace.steps.generation.sources} highlightIndex={highlightedSource} />
           )}
 
           {/* Quality metrics */}

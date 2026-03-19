@@ -4,6 +4,7 @@ import { fixedSizeChunk } from '@/lib/rag/chunkers/fixed-size';
 import { recursiveChunk } from '@/lib/rag/chunkers/recursive';
 import { semanticChunk } from '@/lib/rag/chunkers/semantic';
 import { documentAwareChunk } from '@/lib/rag/chunkers/document-aware';
+import { chunkContextual } from '@/lib/rag/chunkers/contextual';
 
 const DEFAULT_CHUNK_SIZE = 500;
 const DEFAULT_CHUNK_OVERLAP = 50;
@@ -29,6 +30,8 @@ async function runChunker(
       return semanticChunk(content, options);
     case 'document-aware':
       return documentAwareChunk(content, options);
+    case 'contextual':
+      return chunkContextual(content, options);
     default:
       throw new Error(`Unknown chunking strategy: ${strategy}`);
   }
