@@ -26,7 +26,7 @@ export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
-    const { user } = await createAuthenticatedSupabaseClient()
+    const { supabase, user } = await createAuthenticatedSupabaseClient()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       mode: requestedMode = 'auto',
       enhancers: rawEnhancers = [],
       model = 'glm',
-      collection_id,
+      collection_id: requestedCollectionId,
       top_k: requestedTopK = 5,
       rerank: requestedRerank = true,
     } = body
@@ -55,6 +55,20 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required field: question' },
         { status: 400 }
       )
+    }
+
+    // Auto-scope to user's collection for data isolation
+    let collection_id: string | undefined = requestedCollectionId
+    if (!collection_id) {
+      const { data: userCols } = await supabase
+        .from('collections')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (userCols && userCols.length > 0) {
+        collection_id = userCols[0].id
+      }
     }
 
     const tracer = new RAGTracer(question)

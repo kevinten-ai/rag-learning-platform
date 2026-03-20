@@ -12,6 +12,7 @@ export async function GET() {
     const { data: documents, error: docError } = await supabase
       .from('documents')
       .select('id, title, source_type, token_count, created_at, collection_id')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (docError) {

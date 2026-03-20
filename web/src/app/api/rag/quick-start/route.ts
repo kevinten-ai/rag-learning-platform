@@ -17,11 +17,12 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if quick-start collection already exists
+    // Check if quick-start collection already exists for this user
     const { data: existing, error: findError } = await supabase
       .from('collections')
       .select('id')
       .eq('name', QUICK_START_COLLECTION_NAME)
+      .eq('user_id', user.id)
       .limit(1)
       .maybeSingle();
 

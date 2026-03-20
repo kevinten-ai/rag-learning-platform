@@ -8,16 +8,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fetch last 5 queries and total count in parallel
+    // Fetch last 5 queries and total count for this user
     const [recentResult, countResult] = await Promise.all([
       supabase
         .from('query_traces')
         .select('id, question, answer, config, total_duration_ms, created_at')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5),
       supabase
         .from('query_traces')
-        .select('*', { count: 'exact', head: true }),
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id),
     ]);
 
     if (recentResult.error) {

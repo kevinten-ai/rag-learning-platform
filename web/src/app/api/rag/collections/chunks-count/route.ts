@@ -7,9 +7,22 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Get user's collection IDs first, then count chunks in those collections
+    const { data: cols } = await supabase
+      .from('collections')
+      .select('id')
+      .eq('user_id', user.id);
+
+    if (!cols || cols.length === 0) {
+      return NextResponse.json({ count: 0 });
+    }
+
+    const colIds = cols.map((c) => c.id);
     const { count, error } = await supabase
       .from('chunks')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .in('collection_id', colIds);
 
     if (error) {
       console.error('Failed to count chunks:', error);
