@@ -22,20 +22,8 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Allow login page and auth callback without auth
-  if (request.nextUrl.pathname === '/login' || request.nextUrl.pathname.startsWith('/auth/')) {
-    if (user) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
-    return response
-  }
-
-  // Redirect to login if not authenticated
-  if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
+  // Refresh session if it exists (keeps cookies alive)
+  await supabase.auth.getUser()
 
   return response
 }
