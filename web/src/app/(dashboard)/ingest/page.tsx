@@ -51,10 +51,10 @@ interface IngestResult {
 }
 
 const initialSteps: PipelineStep[] = [
-  { id: "fetch", label: "① 获取文档", status: "idle" },
-  { id: "parse", label: "② 解析内容", status: "idle" },
-  { id: "chunk", label: "③ 文本分块", status: "idle" },
-  { id: "embed", label: "④ 向量嵌入", status: "idle" },
+  { id: "fetch", label: "① 获取文档", description: "从飞书/粘贴/文件中获取原始文档内容", status: "idle" },
+  { id: "parse", label: "② 解析内容", description: "提取标题结构、段落、代码块等元素", status: "idle" },
+  { id: "chunk", label: "③ 文本分块", description: "将长文档切分为适合嵌入的小段落", status: "idle" },
+  { id: "embed", label: "④ 向量嵌入", description: "将文本转换为高维向量并存入数据库", status: "idle" },
 ];
 
 export default function IngestPage() {

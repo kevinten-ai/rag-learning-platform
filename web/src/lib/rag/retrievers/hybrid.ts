@@ -86,6 +86,15 @@ export async function hybridRetrieve(
 
   // Sort by fused score descending and take topK
   fusedResults.sort((a, b) => b.score - a.score)
+
+  // Normalize RRF scores to 0-1 range for consistent display
+  const maxScore = fusedResults[0]?.score ?? 1
+  if (maxScore > 0) {
+    for (const r of fusedResults) {
+      r.score = r.score / maxScore
+    }
+  }
+
   const results = fusedResults.slice(0, topK)
 
   return {

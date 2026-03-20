@@ -389,6 +389,28 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Learning Path */}
+      <Card className="border-dashed">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">RAG 学习路径</CardTitle>
+          <CardDescription>
+            按以下顺序体验，逐步理解 RAG 系统的每一层设计
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full bg-blue-100 px-2.5 py-1 font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">① 摄入工坊</span>
+            <span>→ 理解文档如何变成向量</span>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">② 知识库</span>
+            <span>→ 查看向量空间分布</span>
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">③ RAG 问答</span>
+            <span>→ 追踪完整查询链路</span>
+            <span className="rounded-full bg-violet-100 px-2.5 py-1 font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">④ 策略实验室</span>
+            <span>→ 对比不同策略效果</span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Quick Actions */}
       <div>
         <h2 className="mb-4 text-lg font-semibold">快速开始</h2>

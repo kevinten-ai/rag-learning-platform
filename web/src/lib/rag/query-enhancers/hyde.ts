@@ -14,14 +14,22 @@ export async function generateHyDE(
 ): Promise<{ hydeDocument: string; durationMs: number }> {
   const start = Date.now()
 
-  const { text } = await generateText({
-    model: glmModel,
-    system: HYDE_PROMPT,
-    prompt: question,
-  })
+  try {
+    const { text } = await generateText({
+      model: glmModel,
+      system: HYDE_PROMPT,
+      prompt: question,
+    })
 
-  return {
-    hydeDocument: text.trim(),
-    durationMs: Date.now() - start,
+    return {
+      hydeDocument: text.trim(),
+      durationMs: Date.now() - start,
+    }
+  } catch (error) {
+    console.error('HyDE generation failed, skipping:', error)
+    return {
+      hydeDocument: '',
+      durationMs: Date.now() - start,
+    }
   }
 }

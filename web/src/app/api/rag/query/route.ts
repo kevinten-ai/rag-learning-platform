@@ -9,6 +9,7 @@ import { generateMultiQuery } from '@/lib/rag/query-enhancers/multi-query'
 import { semanticRetrieve } from '@/lib/rag/retrievers/semantic'
 import { keywordRetrieve } from '@/lib/rag/retrievers/keyword'
 import { hybridRetrieve } from '@/lib/rag/retrievers/hybrid'
+import { sentenceWindowRetrieve } from '@/lib/rag/retrievers/sentence-window'
 import { rerankResults } from '@/lib/rag/reranker'
 import { assessRetrieval } from '@/lib/rag/corrective-rag'
 import { selfRAGGenerate } from '@/lib/rag/self-rag'
@@ -160,24 +161,40 @@ export async function POST(request: NextRequest) {
     let subQueries: string[] | undefined
     const activeStrategies: string[] = []
 
+    // Run all enabled enhancers in parallel for speed
+    const enhancerPromises: Promise<void>[] = []
+
     if (enhancers.includes('rewrite')) {
-      const result = await rewriteQuery(question)
-      rewritten = result.rewritten
-      effectiveQuery = rewritten
-      activeStrategies.push('rewrite')
+      enhancerPromises.push(
+        rewriteQuery(question).then((result) => {
+          rewritten = result.rewritten
+          effectiveQuery = rewritten
+          activeStrategies.push('rewrite')
+        })
+      )
     }
 
     if (enhancers.includes('hyde')) {
-      const result = await generateHyDE(question)
-      hydeDocument = result.hydeDocument
-      activeStrategies.push('hyde')
+      enhancerPromises.push(
+        generateHyDE(question).then((result) => {
+          if (result.hydeDocument) {
+            hydeDocument = result.hydeDocument
+            activeStrategies.push('hyde')
+          }
+        })
+      )
     }
 
     if (enhancers.includes('multi-query') || enhancers.includes('multiQuery')) {
-      const result = await generateMultiQuery(question)
-      subQueries = result.subQueries
-      activeStrategies.push('multi-query')
+      enhancerPromises.push(
+        generateMultiQuery(question).then((result) => {
+          subQueries = result.subQueries
+          activeStrategies.push('multi-query')
+        })
+      )
     }
+
+    await Promise.all(enhancerPromises)
 
     tracer.recordQueryUnderstanding({
       durationMs: Date.now() - quStart,
@@ -193,7 +210,7 @@ export async function POST(request: NextRequest) {
     // ----------------------------------------------------------------
     const embStart = Date.now()
     // Use the HyDE document for embedding when available, otherwise the (rewritten) query
-    const textToEmbed = hydeDocument ?? effectiveQuery
+    const textToEmbed = (hydeDocument && hydeDocument.length > 0) ? hydeDocument : effectiveQuery
     const { embedding, tokensUsed } = await generateEmbedding(textToEmbed)
 
     tracer.recordEmbedding({
@@ -245,7 +262,7 @@ export async function POST(request: NextRequest) {
 
     tracer.recordRetrieval({
       durationMs: Date.now() - retStart,
-      mode: mode as 'semantic' | 'keyword' | 'hybrid',
+      mode: mode as 'semantic' | 'keyword' | 'hybrid' | 'sentence-window',
       totalCandidates: retrievalResults.length,
       retrieved: Math.min(retrievalResults.length, top_k),
       results: retrievalResults,
@@ -514,6 +531,13 @@ async function runRetrieval(
         collectionId: options.collectionId,
       })
       return { results: res.results, hybridWeights: res.hybridWeights }
+    }
+    case 'sentence-window': {
+      const res = await sentenceWindowRetrieve(query, {
+        topK: options.topK,
+        collectionId: options.collectionId,
+      })
+      return { results: res.results }
     }
     case 'semantic':
     default: {

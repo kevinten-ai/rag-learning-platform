@@ -1,4 +1,5 @@
 import type { RetrievalResult, ContextChunk, RankItem } from '@/types/rag'
+import { estimateTokenCount } from './token-utils'
 
 const SYSTEM_TEMPLATE = `你是一个基于知识库的问答助手。根据提供的参考资料回答用户问题。
 
@@ -59,12 +60,9 @@ export function constructPrompt(
   const userPrompt = `参考文档：\n${contextSection}\n\n用户问题：${question}`
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
 
-  // Rough token estimation (Chinese: ~1.5 tokens/char, English: ~0.25 tokens/word)
-  const estimateTokens = (text: string) => Math.ceil(text.length * 0.7)
-
-  const systemTokens = estimateTokens(systemPrompt)
-  const contextTokens = estimateTokens(contextSection)
-  const queryTokens = estimateTokens(question)
+  const systemTokens = estimateTokenCount(systemPrompt)
+  const contextTokens = estimateTokenCount(contextSection)
+  const queryTokens = estimateTokenCount(question)
 
   return {
     systemPrompt,

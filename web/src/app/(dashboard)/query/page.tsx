@@ -20,6 +20,7 @@ import {
 import { TracePanel } from "@/components/trace/TracePanel";
 import { TraceTimeline } from "@/components/trace/TraceTimeline";
 import { CostEstimator } from "@/components/trace/CostEstimator";
+import { TeacherAnalysis } from "@/components/trace/TeacherAnalysis";
 import { PipelineDiagram, WaterfallChart } from "@/components/rag/pipeline-diagram";
 import { StreamingAnswer } from "@/components/generation/StreamingAnswer";
 import { SourceAttribution } from "@/components/generation/SourceAttribution";
@@ -27,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { PRESET_QUESTIONS } from "@/lib/rag/sample-documents";
 import type { RAGTrace } from "@/types/rag";
 
-type SearchMode = "auto" | "semantic" | "keyword" | "hybrid";
+type SearchMode = "auto" | "semantic" | "keyword" | "hybrid" | "sentence-window";
 
 interface Enhancers {
   rewrite: boolean;
@@ -35,17 +36,18 @@ interface Enhancers {
   multiQuery: boolean;
 }
 
-const MODE_OPTIONS: { value: SearchMode; label: string }[] = [
-  { value: "auto", label: "Auto (智能路由)" },
-  { value: "semantic", label: "语义检索" },
-  { value: "keyword", label: "关键词检索" },
-  { value: "hybrid", label: "混合检索" },
+const MODE_OPTIONS: { value: SearchMode; label: string; desc: string }[] = [
+  { value: "auto", label: "Auto (智能路由)", desc: "AI 根据问题类型自动选择最优检索策略" },
+  { value: "semantic", label: "语义检索", desc: "通过向量相似度理解语义含义" },
+  { value: "keyword", label: "关键词检索", desc: "基于 BM25 的精确关键词匹配" },
+  { value: "hybrid", label: "混合检索", desc: "RRF 融合语义 + 关键词双路检索" },
+  { value: "sentence-window", label: "句窗检索", desc: "精准匹配小块，自动扩展上下文窗口" },
 ];
 
-const ENHANCER_OPTIONS: { key: keyof Enhancers; label: string }[] = [
-  { key: "rewrite", label: "查询改写" },
-  { key: "hyde", label: "HyDE" },
-  { key: "multiQuery", label: "多路查询" },
+const ENHANCER_OPTIONS: { key: keyof Enhancers; label: string; desc: string }[] = [
+  { key: "rewrite", label: "查询改写", desc: "LLM 优化问题表述" },
+  { key: "hyde", label: "HyDE", desc: "生成假设答案辅助检索" },
+  { key: "multiQuery", label: "多路查询", desc: "拆分为多个子查询并合并" },
 ];
 
 export default function QueryPage() {
@@ -264,7 +266,10 @@ export default function QueryPage() {
           RAG 问答 &amp; 流程追踪
         </h1>
         <p className="mt-2 text-muted-foreground">
-          提问并可视化完整 RAG 链路
+          提问并可视化完整 RAG 链路 — 每一步都是透明的
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground/70">
+          查询路由 → 查询增强 → 向量化 → 检索 → CRAG 校正 → 重排序 → Prompt 构造 → LLM 生成 → Self-RAG 反思
         </p>
       </div>
 
@@ -328,12 +333,10 @@ export default function QueryPage() {
               ))}
             </div>
 
-            {/* Auto mode indicator */}
-            {mode === "auto" && (
-              <span className="text-xs italic text-muted-foreground">
-                AI 将自动选择最佳检索策略
-              </span>
-            )}
+            {/* Mode description */}
+            <span className="text-xs italic text-muted-foreground">
+              {MODE_OPTIONS.find((o) => o.value === mode)?.desc}
+            </span>
 
             {/* Enhancer checkboxes (disabled in auto mode) */}
             {mode !== "auto" && (
@@ -343,6 +346,7 @@ export default function QueryPage() {
                   <label
                     key={opt.key}
                     className="flex cursor-pointer items-center gap-1.5 text-xs"
+                    title={opt.desc}
                   >
                     <input
                       type="checkbox"
@@ -417,6 +421,7 @@ export default function QueryPage() {
           <TracePanel
             trace={trace?.steps ?? null}
             selfRag={trace?.selfRag}
+            question={question}
             activeStep={activeStep}
             onStepClick={setActiveStep}
             isLoading={isLoading}
@@ -445,22 +450,28 @@ export default function QueryPage() {
           {trace?.evaluation && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">质量评估</CardTitle>
+                <CardTitle className="text-sm">质量评估 (RAG Triad)</CardTitle>
+                <p className="text-[11px] text-muted-foreground">
+                  RAG 三角评估体系：衡量检索增强生成系统答案质量的三个核心维度
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <QualityBar
-                    label="相关性"
+                    label="相关性 (Relevance)"
+                    desc="答案是否针对用户问题"
                     value={trace.evaluation.relevance}
                     color="bg-blue-500"
                   />
                   <QualityBar
-                    label="忠实度"
+                    label="忠实度 (Faithfulness)"
+                    desc="答案是否忠于检索到的文档"
                     value={trace.evaluation.faithfulness}
                     color="bg-green-500"
                   />
                   <QualityBar
-                    label="完整性"
+                    label="完整性 (Completeness)"
+                    desc="答案是否覆盖问题的所有方面"
                     value={trace.evaluation.completeness}
                     color="bg-amber-500"
                   />
@@ -468,6 +479,9 @@ export default function QueryPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* GLM-5 Teacher Analysis */}
+          <TeacherAnalysis trace={trace} />
         </div>
       </div>
     </div>
@@ -476,10 +490,12 @@ export default function QueryPage() {
 
 function QualityBar({
   label,
+  desc,
   value,
   color,
 }: {
   label: string;
+  desc?: string;
   value: number;
   color: string;
 }) {
@@ -487,7 +503,10 @@ function QualityBar({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
-        <span>{label}</span>
+        <div>
+          <span>{label}</span>
+          {desc && <span className="ml-1 text-[10px] text-muted-foreground">— {desc}</span>}
+        </div>
         <span className="font-mono text-muted-foreground">{pct}%</span>
       </div>
       <div className="h-2 w-full rounded-full bg-muted">

@@ -18,6 +18,29 @@ interface CostRow {
 function buildCostRows(trace: RAGTrace): CostRow[] {
   const rows: CostRow[] = [];
 
+  // Query routing cost (LLM call)
+  if (trace.steps.queryRouting) {
+    rows.push({
+      stage: "智能路由",
+      model: "glm-4-flash",
+      promptTokens: 0,
+      completionTokens: 0,
+      estimatedCost: 0.0005,
+    });
+  }
+
+  // Query enhancement costs (each is an LLM call)
+  if (trace.steps.queryUnderstanding?.activeStrategies?.length) {
+    const strategies = trace.steps.queryUnderstanding.activeStrategies;
+    rows.push({
+      stage: `查询增强 (${strategies.join('+')})`,
+      model: "glm-4-flash",
+      promptTokens: 0,
+      completionTokens: 0,
+      estimatedCost: strategies.length * 0.0005,
+    });
+  }
+
   if (trace.steps.embedding) {
     rows.push({
       stage: "向量化",
@@ -25,6 +48,17 @@ function buildCostRows(trace: RAGTrace): CostRow[] {
       promptTokens: trace.steps.embedding.tokensUsed,
       completionTokens: 0,
       estimatedCost: trace.steps.embedding.tokensUsed * 0.0001,
+    });
+  }
+
+  // CRAG cost (LLM call for assessment + potential re-retrieval)
+  if (trace.steps.crag) {
+    rows.push({
+      stage: "CRAG 校正",
+      model: "glm-4-flash",
+      promptTokens: 0,
+      completionTokens: 0,
+      estimatedCost: trace.steps.crag.retrialPerformed ? 0.002 : 0.001,
     });
   }
 
@@ -45,6 +79,17 @@ function buildCostRows(trace: RAGTrace): CostRow[] {
       promptTokens: trace.steps.generation.tokensUsed.prompt,
       completionTokens: trace.steps.generation.tokensUsed.completion,
       estimatedCost: trace.steps.generation.estimatedCost,
+    });
+  }
+
+  // Self-RAG cost
+  if (trace.selfRag) {
+    rows.push({
+      stage: "Self-RAG 反思",
+      model: "glm-4-flash",
+      promptTokens: 0,
+      completionTokens: 0,
+      estimatedCost: 0.001 + (trace.selfRag.additionalRetrievals * 0.001),
     });
   }
 
@@ -72,6 +117,9 @@ export function CostEstimator({ trace }: CostEstimatorProps) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">费用估算</CardTitle>
+        <p className="text-[11px] text-muted-foreground">
+          每次 RAG 查询涉及多个 LLM/Embedding API 调用，了解各步骤成本有助于优化配置
+        </p>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

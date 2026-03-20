@@ -15,14 +15,22 @@ export async function rewriteQuery(
 ): Promise<{ rewritten: string; durationMs: number }> {
   const start = Date.now()
 
-  const { text } = await generateText({
-    model: glmModel,
-    system: REWRITE_PROMPT,
-    prompt: question,
-  })
+  try {
+    const { text } = await generateText({
+      model: glmModel,
+      system: REWRITE_PROMPT,
+      prompt: question,
+    })
 
-  return {
-    rewritten: text.trim(),
-    durationMs: Date.now() - start,
+    return {
+      rewritten: text.trim(),
+      durationMs: Date.now() - start,
+    }
+  } catch (error) {
+    console.error('Query rewrite failed, using original:', error)
+    return {
+      rewritten: question,
+      durationMs: Date.now() - start,
+    }
   }
 }

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 export interface PipelineStep {
   id: string;
   label: string;
+  description?: string;
   status: "idle" | "running" | "completed" | "error";
   durationMs?: number;
 }
@@ -43,7 +44,12 @@ export function PipelineFlow({ steps, activeStep, onStepClick }: PipelineFlowPro
             {step.status === "error" && (
               <Circle className="size-4 text-destructive" />
             )}
-            <span className="whitespace-nowrap">{step.label}</span>
+            <div className="text-left">
+              <span className="whitespace-nowrap">{step.label}</span>
+              {step.description && (
+                <p className="whitespace-nowrap text-[10px] text-muted-foreground font-normal">{step.description}</p>
+              )}
+            </div>
             {step.durationMs != null && (
               <span className="text-xs text-muted-foreground">
                 {step.durationMs}ms

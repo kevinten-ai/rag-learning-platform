@@ -28,11 +28,13 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { StepExplanation } from "./StepExplanation";
 import type { RAGTrace } from "@/types/rag";
 
 interface TracePanelProps {
   trace: Partial<RAGTrace["steps"]> | null;
   selfRag?: RAGTrace["selfRag"];
+  question?: string;
   activeStep: string | null;
   onStepClick: (step: string) => void;
   isLoading?: boolean;
@@ -63,6 +65,19 @@ const STEPS: StepConfig[] = [
   { key: "generation", name: "LLM 生成", icon: Sparkles, color: "text-rose-500" },
   { key: "selfRag", name: "Self-RAG 反思", icon: RefreshCw, color: "text-indigo-500" },
 ];
+
+/** Educational descriptions explaining what each pipeline step does and why it matters. */
+const STEP_DESCRIPTIONS: Record<string, string> = {
+  queryRouting: "AI 分析问题类型（简单/分析/对比），自动选择最优检索策略和参数，避免一刀切。",
+  queryUnderstanding: "通过改写、HyDE 假设文档、多路查询等策略增强原始问题，提高检索召回率。",
+  embedding: "将文本转换为高维向量（数字序列），使计算机能衡量语义相似度而非仅靠关键词匹配。",
+  retrieval: "在向量数据库中搜索与问题最相似的文档片段。支持语义、关键词、混合三种模式。",
+  crag: "Corrective RAG：评估检索质量，若不足则自动优化查询并重新检索，确保上下文可靠。",
+  reranking: "用 LLM 对检索结果重新评分排序，弥补向量相似度在精确语义理解上的不足。",
+  promptConstruction: "将检索到的文档片段、系统指令和用户问题组装成结构化 Prompt，引导 LLM 生成。",
+  generation: "LLM 根据 Prompt 逐 token 生成回答，并标注引用来源 [1][2] 确保答案可溯源。",
+  selfRag: "Self-RAG：逐段反思答案质量（相关性/可靠性/完整性），发现不足则补充检索并修订。",
+};
 
 function getVisibleSteps(trace: Partial<RAGTrace["steps"]> | null, selfRag?: RAGTrace["selfRag"]): StepConfig[] {
   // Only show optional steps if they exist in the trace
@@ -510,6 +525,7 @@ function StepDetail({
 export function TracePanel({
   trace,
   selfRag,
+  question,
   activeStep,
   onStepClick,
   isLoading,
@@ -603,11 +619,20 @@ export function TracePanel({
                     )}
                   </div>
                 </div>
+                {/* Educational step description */}
+                {STEP_DESCRIPTIONS[step.key] && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {STEP_DESCRIPTIONS[step.key]}
+                  </p>
+                )}
 
                 {/* Expanded details */}
                 {isExpanded && trace && (
                   <div className="mt-3 border-t pt-3">
                     <StepDetail stepKey={step.key} trace={trace} selfRag={selfRag} />
+                    {question && stepData && (
+                      <StepExplanation stepKey={step.key} stepData={stepData} question={question} />
+                    )}
                   </div>
                 )}
               </CardContent>
