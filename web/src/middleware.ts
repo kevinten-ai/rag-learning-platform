@@ -1,8 +1,22 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const SESSION_COOKIE = 'rag-session-id'
+
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request })
+
+  // Ensure every visitor has a unique session ID (for data isolation)
+  if (!request.cookies.get(SESSION_COOKIE)) {
+    const sessionId = crypto.randomUUID()
+    response.cookies.set(SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
+    })
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,12 +36,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if it exists (keeps cookies alive)
+  // Refresh session if it exists
   await supabase.auth.getUser()
 
   return response
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }

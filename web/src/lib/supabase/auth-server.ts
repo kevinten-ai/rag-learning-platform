@@ -2,16 +2,22 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-/** Shared demo user ID used when no auth session exists */
-const DEMO_USER_ID = '00000000-0000-0000-0000-000000000000'
+const SESSION_COOKIE = 'rag-session-id'
 
 /**
  * Create a Supabase client with the current user session.
- * If no authenticated user is found, falls back to a service-role client
- * with a demo user ID so the app works without login (competition mode).
+ *
+ * Auth priority:
+ * 1. Supabase authenticated user (OAuth / email) — uses anon key + RLS
+ * 2. Session cookie visitor (no login) — uses service-role key + cookie-based user ID
+ *
+ * This guarantees data isolation: each browser gets a unique user ID
+ * stored in a httpOnly cookie, so different visitors never see each other's data.
  */
 export async function createAuthenticatedSupabaseClient() {
   const cookieStore = await cookies()
+
+  // Try Supabase auth first
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -34,13 +40,20 @@ export async function createAuthenticatedSupabaseClient() {
     return { supabase, user }
   }
 
-  // No authenticated user — fall back to service-role client for demo access
+  // No authenticated user — use session cookie for data isolation
+  const sessionId = cookieStore.get(SESSION_COOKIE)?.value
+  if (!sessionId) {
+    // Should not happen (middleware sets it), but handle gracefully
+    throw new Error('No session — please refresh the page')
+  }
+
   const serviceClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
   return {
     supabase: serviceClient,
-    user: { id: DEMO_USER_ID } as { id: string },
+    user: { id: sessionId } as { id: string },
   }
 }
