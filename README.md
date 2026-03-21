@@ -1,10 +1,16 @@
 # Glass Box RAG — 可视化 RAG 学习平台
 
-[![Live Demo](https://img.shields.io/badge/demo-rag.rxcloud.group-blue)](https://rag.rxcloud.group)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-pgvector-3ECF8E)](https://supabase.com/)
-[![GLM](https://img.shields.io/badge/LLM-GLM--4--flash-orange)](https://open.bigmodel.cn/)
-[![License](https://img.shields.io/badge/license-ISC-blue)](LICENSE)
+<p align="center">
+  <img src="docs/diagrams/hero-glass-box.png" alt="Glass Box RAG" width="600" />
+</p>
+
+<p align="center">
+  <a href="https://rag.rxcloud.group"><img src="https://img.shields.io/badge/demo-rag.rxcloud.group-blue" alt="Live Demo" /></a>
+  <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-black" alt="Next.js" /></a>
+  <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-pgvector-3ECF8E" alt="Supabase" /></a>
+  <a href="https://open.bigmodel.cn/"><img src="https://img.shields.io/badge/LLM-GLM--4--flash-orange" alt="GLM" /></a>
+  <img src="https://img.shields.io/badge/license-ISC-blue" alt="License" />
+</p>
 
 > **"打开 RAG 的黑盒"** — 一个交互式学习平台，让你亲手操作并可视化 RAG 系统每一步的运作过程。
 
@@ -50,6 +56,10 @@
 
 每次查询都展示完整的 9 步 RAG 管道，每一步都透明可观：
 
+<p align="center">
+  <img src="docs/diagrams/rag-pipeline.png" alt="RAG 9-Step Pipeline" width="600" />
+</p>
+
 ```
 查询路由 → 查询增强 → 向量嵌入 → 文档检索 → CRAG 校正 → 重排序 → Prompt 构造 → LLM 生成 → Self-RAG 反思
 ```
@@ -88,6 +98,10 @@
 ---
 
 ## 技术架构
+
+<p align="center">
+  <img src="docs/diagrams/architecture.png" alt="技术架构" width="560" />
+</p>
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -213,6 +227,10 @@ query_traces (id, user_id, question, config, trace, answer, sources, ...)
 ---
 
 ## 学习路径
+
+<p align="center">
+  <img src="docs/diagrams/learning-path.png" alt="学习路径" width="600" />
+</p>
 
 按以下顺序体验，逐步理解 RAG 系统的每一层设计：
 
