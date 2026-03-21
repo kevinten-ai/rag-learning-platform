@@ -57,8 +57,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Auto-scope to user's collection for data isolation
+    // Scope retrieval to user's collection for data isolation
     let collection_id: string | undefined = requestedCollectionId
+    if (collection_id) {
+      // Verify the collection belongs to this user
+      const { data: col } = await supabase
+        .from('collections')
+        .select('id')
+        .eq('id', collection_id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!col) {
+        collection_id = undefined // Not owned — fall back to auto-detect
+      }
+    }
     if (!collection_id) {
       const { data: userCols } = await supabase
         .from('collections')

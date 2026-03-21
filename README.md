@@ -1,359 +1,228 @@
-# AI RAG Pipeline - 飞书文档知识库构建系统
+# Glass Box RAG — 可视化 RAG 学习平台
 
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Live Demo](https://img.shields.io/badge/demo-rag.rxcloud.group-blue)](https://rag.rxcloud.group)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-pgvector-3ECF8E)](https://supabase.com/)
+[![GLM](https://img.shields.io/badge/LLM-GLM--4--flash-orange)](https://open.bigmodel.cn/)
 [![License](https://img.shields.io/badge/license-ISC-blue)](LICENSE)
 
-## 📖 项目简介
+> **"打开 RAG 的黑盒"** — 一个交互式学习平台，让你亲手操作并可视化 RAG 系统每一步的运作过程。
 
-AI RAG Pipeline 是一个企业级的AI驱动文档处理平台，通过三阶段流水线架构和增量更新机制，实现了从飞书文档到RAG知识库的高效转换。该系统巧妙地解决了文档处理自动化与AI增强之间的核心矛盾，是现代企业知识管理系统的核心基础设施。
+## Demo
 
-## 🏗️ 核心架构
+**在线体验**: [https://rag.rxcloud.group](https://rag.rxcloud.group)
 
-### 三阶段流水线架构
-
-```
-飞书文档 → Clone阶段 → Clean阶段 → Upload阶段 → RAG知识库
-    ↓          ↓           ↓           ↓           ↓
-  原始文档   文档采集    AI增强     向量索引    语义搜索
-```
-
-#### 第一阶段：Clone阶段 (文档采集)
-- 智能飞书文档采集器
-- 增量变更检测机制
-- 文档预处理和格式标准化
-
-#### 第二阶段：Clean阶段 (内容增强)
-- AI驱动的内容分析和元数据生成
-- 文档智能拆分，按token限制处理超长文档
-- 内容质量优化和格式清理
-
-#### 第三阶段：Upload阶段 (索引构建)
-- 向量嵌入生成和存储
-- Elasticsearch索引构建和优化
-- 搜索服务集成和部署
-
-## 🚀 快速开始
-
-### 环境要求
-
-- Node.js >= 18.0.0
-- MongoDB >= 4.0
-- Elasticsearch >= 8.0
-- OpenAI API Key
-
-### 安装步骤
-
-1. **克隆项目**
-```bash
-git clone https://github.com/kevinten-business/ai-rag-pipeline.git
-cd ai-rag-pipeline
-```
-
-2. **安装依赖**
-```bash
-npm install
-```
-
-3. **配置环境变量**
-
-复制配置文件并填写实际值：
-```bash
-cp src/config/config.example.js src/config/config.js
-# 或设置环境变量
-cp .env.example .env
-```
-
-必需的配置项：
-- 飞书应用ID和密钥
-- OpenAI API Key
-- Elasticsearch连接信息
-- MongoDB连接信息
-
-4. **验证配置**
-```bash
-node -e "require('./src/config/config').validate()"
-```
-
-5. **运行流水线**
-```bash
-# 运行完整流水线
-npm run pipeline
-
-# 或分别运行各阶段
-npm run clone    # 文档采集
-npm run clean    # 内容处理
-npm run upload   # 索引构建
-```
-
-## ⚙️ 配置说明
-
-### 环境变量配置
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `FEISHU_APP_ID` | 飞书应用ID | 必填 |
-| `FEISHU_APP_SECRET` | 飞书应用密钥 | 必填 |
-| `OPENAI_API_KEY` | OpenAI API密钥 | 必填 |
-| `ES_HOST` | Elasticsearch主机地址 | 必填 |
-| `ES_USERNAME` | Elasticsearch用户名 | 必填 |
-| `ES_PASSWORD` | Elasticsearch密码 | 必填 |
-| `MONGODB_URI` | MongoDB连接URI | mongodb://localhost:27017 |
-
-### 性能调优参数
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `MAX_CONCURRENT_AI_REQUESTS` | 最大并发AI请求数 | 5 |
-| `DOCUMENT_SPLIT_SIZE` | 文档拆分大小(token) | 7000 |
-| `BATCH_SIZE` | 批量处理大小 | 10 |
-
-## 📊 核心特性
-
-### 增量更新机制
-- **智能缓存**: 基于文件哈希的变更检测
-- **性能优化**: 避免重复处理，提升效率80-95%
-- **状态管理**: MongoDB缓存文件处理状态
-
-### AI增强处理
-- **标题生成**: GPT模型自动生成高质量标题
-- **内容摘要**: 智能提取文档关键信息
-- **关键词提取**: 自动标注文档关键词
-- **文档拆分**: 智能处理超长文档
-
-### 向量搜索集成
-- **Embedding生成**: OpenAI text-embedding-ada-002
-- **Elasticsearch集成**: 高性能向量相似度搜索
-- **语义检索**: 支持自然语言查询
-
-## 🛠️ 使用命令
-
-### 基本命令
-
-```bash
-# 开发模式（带热重载）
-npm run dev
-
-# 生产模式启动
-npm start
-
-# 运行测试
-npm test
-
-# 代码检查和格式化
-npm run lint
-
-# 构建检查（lint + test）
-npm run build
-```
-
-### 流水线命令
-
-```bash
-# 完整流水线（推荐）
-npm run pipeline -- --folders "folder1,folder2"
-
-# 或使用环境变量
-FOLDER_TOKENS="folder1,folder2" npm run pipeline
-
-# 单独运行阶段
-npm run clone -- --folders "folder1"          # 文档采集
-npm run clean -- --input processed_docs.json  # 内容处理
-npm run upload -- --input clean_docs.json     # 索引构建
-
-# 强制更新模式
-npm run pipeline -- --force-full              # 强制全量更新
-npm run pipeline -- --force-reprocess         # 强制重新处理AI内容
-npm run pipeline -- --force-reindex           # 强制重新索引
-
-# 调试模式
-DEBUG=true npm run pipeline                   # 启用详细日志
-```
-
-### 脚本命令
-
-```bash
-# 使用脚本运行（支持更多选项）
-node scripts/run-pipeline.js folder1 folder2
-node scripts/run-clone.js folder1
-node scripts/run-clean.js --input docs.json --output processed.json
-node scripts/run-upload.js --input processed.json
-
-# 环境变量配置
-export FOLDER_TOKENS="folder1,folder2"
-export BATCH_SIZE=20
-export MAX_CONCURRENT_AI_REQUESTS=3
-node scripts/run-pipeline.js
-```
-
-## 📈 性能监控
-
-系统提供完整的性能监控和日志记录：
-
-- **处理统计**: 文档数量、处理时间、成功率
-- **缓存命中率**: 增量更新的缓存利用率
-- **AI调用统计**: API使用量和成本监控
-- **错误日志**: 详细的错误记录和告警
-
-## 🚀 Docker部署
-
-### 使用Docker Compose（推荐）
-
-1. **准备环境文件**
-```bash
-# 复制环境配置
-cp .env.example .env
-
-# 编辑环境变量
-nano .env
-```
-
-2. **启动服务**
-```bash
-# 生产环境
-docker-compose up -d
-
-# 开发环境
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
-
-# 只启动核心服务（不包含监控）
-docker-compose up -d rag-pipeline mongodb elasticsearch
-```
-
-3. **查看日志**
-```bash
-# 查看所有服务日志
-docker-compose logs -f
-
-# 查看特定服务日志
-docker-compose logs -f rag-pipeline
-```
-
-4. **停止服务**
-```bash
-docker-compose down
-```
-
-### 手动Docker部署
-
-```bash
-# 构建镜像
-docker build -t rag-pipeline .
-
-# 运行容器
-docker run -d \
-  --name rag-pipeline \
-  --env-file .env \
-  -v $(pwd)/logs:/app/logs \
-  rag-pipeline
-```
-
-### 扩展开发
-
-#### 添加新的文档源
-
-1. **实现新的处理器类**：
-```javascript
-const FeishuDocumentProcessor = require('../services/feishu-processor');
-
-class NewSourceProcessor extends FeishuDocumentProcessor {
-  async processDocument(document, content) {
-    // 实现特定文档源的处理逻辑
-    return this.processDocument(document, content);
-  }
-}
-```
-
-2. **注册到CloneManager**：
-```javascript
-// 在 CloneStage 中添加
-if (source.type === 'newsource') {
-  const NewSourceProcessor = require('../processors/NewSourceProcessor');
-  processor = new NewSourceProcessor(this.config);
-}
-```
-
-#### 自定义AI处理能力
-
-1. **扩展OpenAI服务**：
-```javascript
-// 在 OpenAIService 中添加新方法
-async customAIProcessing(content, options) {
-  // 自定义AI处理逻辑
-}
-```
-
-2. **支持其他AI提供商**：
-```javascript
-class CustomAIProvider {
-  async generateEmbedding(text) {
-    // 调用其他AI服务
-    return embeddingVector;
-  }
-}
-```
-
-#### 扩展上传策略
-
-1. **实现新的索引策略**：
-```javascript
-class CustomUploadStrategy {
-  async execute(documents, config) {
-    // 自定义索引逻辑
-    return { successCount: documents.length };
-  }
-}
-```
-
-2. **注册策略**：
-```javascript
-// 在 UploadStage 中选择策略
-const strategy = new CustomUploadStrategy();
-await strategy.execute(documents, this.config);
-```
-
-## 🐛 故障排除
-
-### 常见问题
-
-- **飞书API认证失败**: 检查应用ID和密钥配置
-- **OpenAI API限流**: 调整并发请求数
-- **Elasticsearch连接失败**: 验证网络和认证信息
-- **MongoDB连接错误**: 检查连接字符串和权限
-
-### 调试模式
-
-```bash
-# 启用详细日志
-DEBUG=true npm run pipeline
-
-# 单独运行阶段调试
-node scripts/run-clone.js
-```
-
-## 📚 API文档
-
-详细的API文档请参考 [docs/api.md](docs/api.md)
-
-## 🤝 贡献指南
-
-1. Fork 本项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
-## 📄 许可证
-
-本项目采用 ISC 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
-## 🙏 致谢
-
-- OpenAI - 提供强大的AI能力
-- Elasticsearch - 优秀的搜索引擎
-- 飞书 - 优质的协作平台
+无需登录，打开即用。点击"一键体验"自动导入示例文档，立即开始 RAG 问答。
 
 ---
 
-**技术栈**: Node.js, OpenAI, Elasticsearch, MongoDB, 飞书API
+## 页面展示
 
-**应用场景**: 企业知识库构建, AI问答系统, 文档智能检索
+### Dashboard — 学习入口
+
+![Dashboard](docs/screenshots/01-dashboard.png)
+
+一键体验 RAG、学习路径引导、数据统计总览。
+
+### 文档摄入工坊 — 理解文档如何变成向量
+
+![文档摄入](docs/screenshots/02-ingest.png)
+
+支持粘贴文本、上传文件、飞书链接、示例文档四种输入方式，可视化 4 步处理管道（获取 → 解析 → 分块 → 嵌入）。
+
+### RAG 问答 & 流程追踪 — 9 步管道全透明
+
+![RAG 问答](docs/screenshots/04-query.png)
+
+5 种检索模式切换、推荐问题快速体验、管道步骤卡片实时展示耗时与中间结果。
+
+### RAG 技术目录 — 19 项技术一览
+
+![技术目录](docs/screenshots/05-techniques.png)
+
+分块(5) → 检索(4) → 增强(5) → 生成(4) → 评估(1)，每项技术都可交互体验、全程可视化追踪。
+
+---
+
+## 核心特性
+
+### Glass Box 可视化
+
+每次查询都展示完整的 9 步 RAG 管道，每一步都透明可观：
+
+```
+查询路由 → 查询增强 → 向量嵌入 → 文档检索 → CRAG 校正 → 重排序 → Prompt 构造 → LLM 生成 → Self-RAG 反思
+```
+
+- **管道瀑布图** — 可视化各步骤耗时分布
+- **费用估算表** — 每步 API 调用成本明细
+- **引用溯源** — 回答中的 [1][2] 标注可追溯到原始文档块
+- **质量评估** — RAG Triad (Faithfulness / Relevance / Completeness) 自动评分
+
+### 教学功能
+
+| 功能 | 说明 |
+|------|------|
+| **智能路由** | AI 自动分析问题类型，选择最优检索策略 |
+| **CRAG 校正** | Corrective RAG — 自动评估检索质量，不足时重查 |
+| **Self-RAG 反思** | 模型对自身回答进行段落级自省 |
+| **GLM-5 老师分析** | 一键调用 GLM-5 对每步给出教学讲解 |
+| **策略对比** | 在实验室中对比不同检索模式、增强器的效果差异 |
+
+### 5 种检索模式
+
+| 模式 | 说明 |
+|------|------|
+| Auto (智能路由) | AI 根据问题自动选择最优策略 |
+| 语义检索 | 向量余弦相似度搜索 |
+| 关键词检索 | PostgreSQL 全文搜索 (tsvector) |
+| 混合检索 | 语义 + 关键词 RRF 融合 |
+| 句窗检索 | 精确匹配 + 上下文窗口扩展 |
+
+### 3 种查询增强器
+
+- **Query Rewrite** — LLM 改写优化查询
+- **HyDE** — 生成假设文档用于嵌入
+- **Multi-Query** — 拆分为多个子查询并行检索
+
+---
+
+## 技术架构
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Next.js 16 (App Router)           │
+│  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌─────┐ │
+│  │ 文档摄入 │  │  知识库   │  │ RAG 问答  │  │ 实验室│ │
+│  └────┬────┘  └────┬─────┘  └────┬─────┘  └──┬──┘ │
+│       └────────────┴──────┬──────┴────────────┘    │
+│                           │                         │
+│  ┌────────────────────────┴──────────────────────┐ │
+│  │              RAG Pipeline Engine               │ │
+│  │  Router → Enhancers → Embedding → Retrieval   │ │
+│  │  → CRAG → Reranker → Generator → Self-RAG     │ │
+│  └──────────┬────────────────────┬───────────────┘ │
+└─────────────┼────────────────────┼─────────────────┘
+              │                    │
+    ┌─────────▼─────────┐  ┌──────▼──────┐
+    │  Supabase + pgvector │  │  GLM-4-flash │
+    │  (向量存储 + SQL)     │  │  (LLM 推理)   │
+    └───────────────────┘  └─────────────┘
+```
+
+| 层 | 技术 |
+|----|------|
+| 前端 | Next.js 16, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
+| LLM | 智谱 GLM-4-flash (管道), GLM-5 (教学分析) |
+| 向量数据库 | Supabase pgvector (1024d, HNSW 索引) |
+| 嵌入模型 | 智谱 embedding-3 |
+| 全文搜索 | PostgreSQL tsvector + GIN 索引 |
+| 数据隔离 | Session Cookie UUID (免登录, 30 天有效) |
+| 部署 | Vercel (Serverless Edge) |
+
+---
+
+## 项目结构
+
+```
+ai-rag-pipeline/
+├── web/                          # Glass Box RAG 学习平台 (Next.js)
+│   ├── src/
+│   │   ├── app/                  # App Router 页面
+│   │   │   ├── (dashboard)/      # Dashboard, 摄入, 知识库, 问答, 实验室
+│   │   │   └── api/rag/          # RAG API 路由
+│   │   ├── lib/
+│   │   │   ├── rag/              # RAG 核心引擎
+│   │   │   │   ├── query-router.ts         # 智能查询路由
+│   │   │   │   ├── query-enhancers/        # Rewrite / HyDE / Multi-Query
+│   │   │   │   ├── retrievers/             # Semantic / Keyword / Hybrid / Sentence-Window
+│   │   │   │   ├── corrective-rag.ts       # CRAG 校正
+│   │   │   │   ├── self-rag.ts             # Self-RAG 反思
+│   │   │   │   ├── reranker.ts             # LLM 重排序
+│   │   │   │   ├── generator.ts            # Prompt 构造 + 生成
+│   │   │   │   ├── evaluator.ts            # RAG Triad 评估
+│   │   │   │   └── teacher-analysis.ts     # GLM-5 教学分析
+│   │   │   ├── llm/glm.ts                  # 智谱 GLM 模型配置
+│   │   │   ├── embedding/zhipu.ts          # 智谱 Embedding
+│   │   │   └── supabase/                   # 数据库客户端 + 认证
+│   │   └── components/
+│   │       ├── trace/            # TracePanel, 步骤详情, 教师分析
+│   │       └── pipeline/         # 摄入管道可视化
+│   └── supabase/migrations/     # 数据库迁移
+│
+├── src/                          # 后端 RAG Pipeline (Node.js)
+│   ├── index.js                  # CLI 入口
+│   ├── pipeline-orchestrator.js  # 三阶段编排器
+│   ├── stages/                   # Clone → Clean → Upload
+│   └── services/                 # Feishu, OpenAI, ES, MongoDB
+│
+└── tests/                        # Jest 测试 (70%+ 覆盖率)
+```
+
+---
+
+## 快速开始
+
+### 在线体验 (推荐)
+
+直接访问 [https://rag.rxcloud.group](https://rag.rxcloud.group)，点击"一键体验"。
+
+### 本地开发
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/kevinten-ai/rag-learning-platform.git
+cd ai-rag-pipeline/web
+
+# 2. 安装依赖
+npm install
+
+# 3. 配置环境变量
+cp .env.local.example .env.local
+# 填写: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+#       SUPABASE_SERVICE_ROLE_KEY, GLM_API_KEY
+
+# 4. 启动开发服务器
+npm run dev
+```
+
+### 后端 Pipeline (飞书文档采集)
+
+```bash
+cd ai-rag-pipeline
+npm install
+npm run pipeline -- --folders "folder1,folder2"
+```
+
+详见 [CLAUDE.md](CLAUDE.md) 中的完整命令参考。
+
+---
+
+## 数据库 Schema
+
+```sql
+collections (id, name, user_id, chunk_strategy, embedding_model, ...)
+  └── documents (id, collection_id, user_id, title, raw_content, ...)
+       └── chunks (id, document_id, collection_id, content, embedding vector(1024), fts tsvector, ...)
+
+query_traces (id, user_id, question, config, trace, answer, sources, ...)
+```
+
+向量搜索通过 `match_chunks()` RPC 函数实现，使用 HNSW 索引 + 余弦相似度。
+
+---
+
+## 学习路径
+
+按以下顺序体验，逐步理解 RAG 系统的每一层设计：
+
+1. **文档摄入工坊** — 理解文档如何变成向量
+2. **知识库管理** — 查看向量空间 3D 分布
+3. **RAG 问答** — 追踪完整查询链路 (9 步管道)
+4. **策略实验室** — 对比不同检索策略的效果差异
+
+---
+
+## License
+
+ISC
