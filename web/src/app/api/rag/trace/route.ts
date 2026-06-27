@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (error || !data) {
-      return NextResponse.json({ error: 'Trace not found' }, { status: 404 })
+      return NextResponse.json({ pending: true }, { status: 202 })
     }
 
     return NextResponse.json(data.trace)

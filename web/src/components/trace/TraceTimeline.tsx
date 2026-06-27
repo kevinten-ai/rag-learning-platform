@@ -1,14 +1,3 @@
-"use client";
-
-import {
-  Bar,
-  BarChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface TraceTimelineProps {
@@ -16,35 +5,20 @@ interface TraceTimelineProps {
 }
 
 const STEP_COLORS: Record<string, string> = {
-  "查询理解": "hsl(263, 70%, 58%)",
-  "向量化": "hsl(217, 91%, 60%)",
-  "检索": "hsl(189, 94%, 43%)",
-  "重排序": "hsl(38, 92%, 50%)",
-  "Prompt 构造": "hsl(142, 71%, 45%)",
-  "LLM 生成": "hsl(350, 89%, 60%)",
+  "查询路由": "bg-indigo-500",
+  "查询理解": "bg-violet-500",
+  "向量化": "bg-blue-500",
+  "检索": "bg-cyan-500",
+  "重排序": "bg-amber-500",
+  "Prompt 构造": "bg-green-500",
+  "LLM 生成": "bg-rose-500",
 };
-
-function CustomTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: { name: string; durationMs: number } }>;
-}) {
-  if (!active || !payload?.length) return null;
-  const data = payload[0].payload;
-  return (
-    <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-sm">
-      <p className="font-medium">{data.name}</p>
-      <p className="text-muted-foreground">{data.durationMs}ms</p>
-    </div>
-  );
-}
 
 export function TraceTimeline({ steps }: TraceTimelineProps) {
   if (!steps.length) return null;
 
   const totalMs = steps.reduce((sum, s) => sum + s.durationMs, 0);
+  const maxMs = Math.max(...steps.map((s) => s.durationMs), 1);
 
   return (
     <Card>
@@ -57,31 +31,22 @@ export function TraceTimeline({ steps }: TraceTimelineProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-36">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={steps} layout="vertical" margin={{ left: 10 }}>
-              <XAxis
-                type="number"
-                tick={{ fontSize: 10 }}
-                tickFormatter={(v: number) => `${v}ms`}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tick={{ fontSize: 10 }}
-                width={80}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="durationMs" radius={[0, 4, 4, 0]} barSize={16}>
-                {steps.map((entry) => (
-                  <Cell
-                    key={entry.name}
-                    fill={STEP_COLORS[entry.name] || "hsl(var(--primary))"}
+        <div className="space-y-2">
+          {steps.map((step) => {
+            const width = Math.max((step.durationMs / maxMs) * 100, 3);
+            return (
+              <div key={step.name} className="grid grid-cols-[72px_1fr_64px] items-center gap-2 text-xs">
+                <span className="truncate text-right text-muted-foreground">{step.name}</span>
+                <div className="h-4 min-w-0 rounded bg-muted">
+                  <div
+                    className={`h-full rounded ${STEP_COLORS[step.name] ?? "bg-primary"}`}
+                    style={{ width: `${width}%` }}
                   />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                </div>
+                <span className="font-mono text-muted-foreground">{step.durationMs}ms</span>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
