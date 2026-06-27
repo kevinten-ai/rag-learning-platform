@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
       model = 'ark',
       collection_id: requestedCollectionId,
       top_k: requestedTopK = 5,
-      rerank: requestedRerank = true,
+      rerank: requestedRerank = false,
+      crag: requestedCrag = false,
     } = body
 
     // Normalize enhancers: accept both array ['rewrite'] and object { rewrite: true }
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
         // Apply router suggestions
         mode = routingResult.suggestedRetrieval
         top_k = routingResult.suggestedTopK
-        rerank = routingResult.needsReranking
+        rerank = requestedRerank && routingResult.needsReranking
         enhancers = routingResult.suggestedEnhancers
 
         tracer.recordQueryRouting({
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
         model: arkModel,
         system: '你是一个友好的AI助手。直接回答用户的问题，不需要引用任何参考资料。',
         prompt: question,
+        maxOutputTokens: 500,
         onFinish: async ({ text, usage }) => {
           const promptTokens = usage?.inputTokens ?? 0
           const completionTokens = usage?.outputTokens ?? 0
@@ -301,7 +303,7 @@ export async function POST(request: NextRequest) {
     let cragRefinedQuery: string | undefined
     let retrialPerformed = false
 
-    if (retrievalResults.length > 0) {
+    if (isAdvancedAssessmentEnabled(requestedCrag) && retrievalResults.length > 0) {
       const cragStart = Date.now()
       const originalChunkCount = retrievalResults.length
       try {
@@ -423,6 +425,7 @@ export async function POST(request: NextRequest) {
       model: selectedModel,
       system: promptResult.systemPrompt,
       prompt: promptResult.userPrompt,
+      maxOutputTokens: 700,
       onFinish: async ({ text, usage }) => {
         // Record generation step
         const sources = finalResults.map((r) => ({
@@ -447,38 +450,40 @@ export async function POST(request: NextRequest) {
           estimatedCost: estimateCost(modelName, promptTokens, completionTokens),
         })
 
-        // Run evaluation asynchronously (best-effort)
-        try {
-          const contextText = finalResults.map((r) => r.content).join('\n\n')
-          const assessment = await evaluateAnswer(question, text, contextText)
-          tracer.recordEvaluation(assessment)
-        } catch {
-          // Evaluation failure is non-critical
-        }
-
-        // Self-RAG reflection (best-effort, non-blocking)
-        try {
-          const selfRagStart = Date.now()
-          const chunks = finalResults.map((r) => ({ content: r.content, chunkId: r.chunkId }))
-          const retrieveFn = async (q: string) => {
-            const res = await runRetrieval(q, mode, retrieveOpts)
-            return res.results.map((r) => ({ content: r.content }))
+        if (isPostGenerationAnalysisEnabled()) {
+          // Run evaluation asynchronously (best-effort)
+          try {
+            const contextText = finalResults.map((r) => r.content).join('\n\n')
+            const assessment = await evaluateAnswer(question, text, contextText)
+            tracer.recordEvaluation(assessment)
+          } catch {
+            // Evaluation failure is non-critical
           }
-          const selfRagResult = await selfRAGGenerate(question, chunks, retrieveFn)
-          tracer.recordSelfRAG({
-            durationMs: Date.now() - selfRagStart,
-            wasRevised: selfRagResult.wasRevised,
-            additionalRetrievals: selfRagResult.additionalRetrievals,
-            reflections: selfRagResult.reflections.map((r) => ({
-              paragraph: r.paragraph.slice(0, 200),
-              isRelevant: r.isRelevant,
-              isSupported: r.isSupported,
-              isComplete: r.isComplete,
-              critique: r.critique,
-            })),
-          })
-        } catch {
-          // Self-RAG failure is non-critical
+
+          // Self-RAG reflection (best-effort)
+          try {
+            const selfRagStart = Date.now()
+            const chunks = finalResults.map((r) => ({ content: r.content, chunkId: r.chunkId }))
+            const retrieveFn = async (q: string) => {
+              const res = await runRetrieval(q, mode, retrieveOpts)
+              return res.results.map((r) => ({ content: r.content }))
+            }
+            const selfRagResult = await selfRAGGenerate(question, chunks, retrieveFn)
+            tracer.recordSelfRAG({
+              durationMs: Date.now() - selfRagStart,
+              wasRevised: selfRagResult.wasRevised,
+              additionalRetrievals: selfRagResult.additionalRetrievals,
+              reflections: selfRagResult.reflections.map((r) => ({
+                paragraph: r.paragraph.slice(0, 200),
+                isRelevant: r.isRelevant,
+                isSupported: r.isSupported,
+                isComplete: r.isComplete,
+                critique: r.critique,
+              })),
+            })
+          } catch {
+            // Self-RAG failure is non-critical
+          }
         }
 
         // Save the complete trace to Supabase (best-effort)
@@ -529,6 +534,14 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+function isAdvancedAssessmentEnabled(requestedCrag: unknown): boolean {
+  return requestedCrag === true || process.env.RAG_ENABLE_ADVANCED_ASSESSMENT === 'true'
+}
+
+function isPostGenerationAnalysisEnabled(): boolean {
+  return process.env.RAG_ENABLE_POST_GENERATION_ANALYSIS === 'true'
 }
 
 // ----------------------------------------------------------------
