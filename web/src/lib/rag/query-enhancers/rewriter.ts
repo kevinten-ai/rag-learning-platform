@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel } from '@/lib/llm/ark'
 
 const REWRITE_PROMPT = `你是一个查询优化专家。请将用户的原始问题改写为更适合知识库检索的查询语句。
 
@@ -17,7 +17,7 @@ export async function rewriteQuery(
 
   try {
     const { text } = await generateText({
-      model: glmModel,
+      model: arkModel,
       system: REWRITE_PROMPT,
       prompt: question,
     })

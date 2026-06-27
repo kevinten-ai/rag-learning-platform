@@ -31,7 +31,7 @@ const STRATEGY_COLORS: Record<string, string> = {
   hyde: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
   "multi-query": "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
   kimi: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
-  glm: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
+  ark: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
   "fixed-size": "bg-slate-500/10 text-slate-700 dark:text-slate-400",
   recursive: "bg-teal-500/10 text-teal-700 dark:text-teal-400",
   "document-aware": "bg-purple-500/10 text-purple-700 dark:text-purple-400",

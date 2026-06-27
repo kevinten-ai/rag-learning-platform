@@ -1,4 +1,4 @@
-import { generateEmbedding } from '@/lib/embedding/zhipu'
+import { generateEmbedding } from '@/lib/embedding/ark'
 import { matchChunks } from '@/lib/supabase/vectors'
 import type { RetrievalResult } from '@/types/rag'
 

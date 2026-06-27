@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateEmbedding } from '@/lib/embedding/zhipu';
+import { generateEmbedding } from '@/lib/embedding/ark';
 import { matchChunks } from '@/lib/supabase/vectors';
 import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 

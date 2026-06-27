@@ -42,7 +42,7 @@ export function TeacherAnalysis({ trace }: TeacherAnalysisProps) {
         setAnalysis((prev) => prev + decoder.decode(value));
       }
     } catch {
-      setAnalysis("教学分析暂时不可用，请确认 GLM_API_KEY 已配置且支持 glm-5 模型。");
+      setAnalysis("教学分析暂时不可用，请确认 ARK_API_KEY 已配置且 Ark 模型可用。");
     } finally {
       setIsStreaming(false);
     }
@@ -60,7 +60,7 @@ export function TeacherAnalysis({ trace }: TeacherAnalysisProps) {
         onClick={runAnalysis}
       >
         <GraduationCap className="size-4" />
-        GLM-5 老师分析
+        Ark 老师分析
       </Button>
     );
   }
@@ -70,7 +70,7 @@ export function TeacherAnalysis({ trace }: TeacherAnalysisProps) {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-sm text-indigo-700 dark:text-indigo-300">
           <GraduationCap className="size-4" />
-          GLM-5 老师分析报告
+          Ark 老师分析报告
           {isStreaming && <Loader2 className="size-3 animate-spin" />}
         </CardTitle>
         <div className="flex items-center gap-1">

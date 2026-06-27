@@ -8,7 +8,7 @@
   <a href="https://rag.rxcloud.group"><img src="https://img.shields.io/badge/demo-rag.rxcloud.group-blue" alt="Live Demo" /></a>
   <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-black" alt="Next.js" /></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-pgvector-3ECF8E" alt="Supabase" /></a>
-  <a href="https://open.bigmodel.cn/"><img src="https://img.shields.io/badge/LLM-GLM--4--flash-orange" alt="GLM" /></a>
+  <a href="https://www.volcengine.com/product/ark"><img src="https://img.shields.io/badge/LLM-Ark--4--flash-orange" alt="Ark" /></a>
   <img src="https://img.shields.io/badge/license-ISC-blue" alt="License" />
 </p>
 
@@ -76,7 +76,7 @@
 | **智能路由** | AI 自动分析问题类型，选择最优检索策略 |
 | **CRAG 校正** | Corrective RAG — 自动评估检索质量，不足时重查 |
 | **Self-RAG 反思** | 模型对自身回答进行段落级自省 |
-| **GLM-5 老师分析** | 一键调用 GLM-5 对每步给出教学讲解 |
+| **Ark 老师分析** | 一键调用 Ark 对每步给出教学讲解 |
 | **策略对比** | 在实验室中对比不同检索模式、增强器的效果差异 |
 
 ### 5 种检索模式
@@ -119,7 +119,7 @@
 └─────────────┼────────────────────┼─────────────────┘
               │                    │
     ┌─────────▼─────────┐  ┌──────▼──────┐
-    │  Supabase + pgvector │  │  GLM-4-flash │
+    │  Supabase + pgvector │  │  Ark CodingPlan │
     │  (向量存储 + SQL)     │  │  (LLM 推理)   │
     └───────────────────┘  └─────────────┘
 ```
@@ -127,9 +127,9 @@
 | 层 | 技术 |
 |----|------|
 | 前端 | Next.js 16, TypeScript, Tailwind CSS, shadcn/ui, Recharts |
-| LLM | 智谱 GLM-4-flash (管道), GLM-5 (教学分析) |
+| LLM | 火山引擎 Ark Ark CodingPlan (管道), Ark (教学分析) |
 | 向量数据库 | Supabase pgvector (1024d, HNSW 索引) |
-| 嵌入模型 | 智谱 embedding-3 |
+| 嵌入模型 | 火山引擎 Ark doubao-embedding-vision-251215 |
 | 全文搜索 | PostgreSQL tsvector + GIN 索引 |
 | 数据隔离 | Session Cookie UUID (免登录, 30 天有效) |
 | 部署 | Vercel (Serverless Edge) |
@@ -155,9 +155,9 @@ ai-rag-pipeline/
 │   │   │   │   ├── reranker.ts             # LLM 重排序
 │   │   │   │   ├── generator.ts            # Prompt 构造 + 生成
 │   │   │   │   ├── evaluator.ts            # RAG Triad 评估
-│   │   │   │   └── teacher-analysis.ts     # GLM-5 教学分析
-│   │   │   ├── llm/glm.ts                  # 智谱 GLM 模型配置
-│   │   │   ├── embedding/zhipu.ts          # 智谱 Embedding
+│   │   │   │   └── teacher-analysis.ts     # Ark 教学分析
+│   │   │   ├── llm/ark.ts                  # 火山引擎 Ark Ark 模型配置
+│   │   │   ├── embedding/ark.ts          # 火山引擎 Ark Embedding
 │   │   │   └── supabase/                   # 数据库客户端 + 认证
 │   │   └── components/
 │   │       ├── trace/            # TracePanel, 步骤详情, 教师分析
@@ -194,7 +194,7 @@ npm install
 # 3. 配置环境变量
 cp .env.local.example .env.local
 # 填写: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
-#       SUPABASE_SERVICE_ROLE_KEY, GLM_API_KEY
+#       SUPABASE_SERVICE_ROLE_KEY, ARK_API_KEY
 
 # 4. 启动开发服务器
 npm run dev

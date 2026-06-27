@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel } from '@/lib/llm/ark'
 import type { RetrievalResult } from '@/types/rag'
 
 export interface CRAGAssessment {
@@ -42,7 +42,7 @@ export async function assessRetrieval(
 
   try {
     const { text } = await generateText({
-      model: glmModel,
+      model: arkModel,
       system: CRAG_PROMPT,
       prompt: `用户问题：${question}\n\n检索到 ${chunks.length} 个文档片段：\n${candidateList}`,
       temperature: 0.1,

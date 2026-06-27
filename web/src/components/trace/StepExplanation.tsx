@@ -56,7 +56,7 @@ export function StepExplanation({ stepKey, stepData, question }: StepExplanation
         onClick={fetchExplanation}
       >
         <GraduationCap className="size-3" />
-        {isVisible ? "收起讲解" : "GLM-5 老师讲解"}
+        {isVisible ? "收起讲解" : "Ark 老师讲解"}
       </Button>
 
       {isVisible && (
@@ -69,7 +69,7 @@ export function StepExplanation({ stepKey, stepData, question }: StepExplanation
           {isLoading ? (
             <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
               <Loader2 className="size-3 animate-spin" />
-              <span>GLM-5 老师正在分析...</span>
+              <span>Ark 老师正在分析...</span>
             </div>
           ) : (
             <div className="whitespace-pre-wrap">{explanation}</div>

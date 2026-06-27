@@ -1,17 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
   CardContent,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { StrategyCompare, type CompareResult } from "@/components/lab/StrategyCompare";
 import { RadarChart } from "@/components/lab/RadarChart";
@@ -60,7 +56,7 @@ const QUERY_STRATEGIES: StrategyOption[] = [
 
 const MODEL_STRATEGIES: StrategyOption[] = [
   { id: "kimi", label: "Kimi (Moonshot)", description: "月之暗面大模型" },
-  { id: "glm", label: "GLM (智谱)", description: "智谱清言大模型" },
+  { id: "ark", label: "Ark (Volcengine)", description: "火山引擎 Ark CodingPlan" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -112,7 +108,7 @@ function useExperiment(defaultStrategies: string[]) {
 
 const RETRIEVAL_MODE_IDS = new Set(["semantic", "keyword", "hybrid"]);
 const QUERY_ENHANCER_IDS = new Set(["rewrite", "hyde", "multi-query"]);
-const MODEL_IDS = new Set(["kimi", "glm"]);
+const MODEL_IDS = new Set(["kimi", "ark"]);
 
 /** Call the query API with given config and return a CompareResult */
 async function runStrategyQuery(
@@ -343,10 +339,12 @@ function ChunkingControls({
   const [chunkSize, setChunkSize] = useState(512);
   const [chunkOverlap, setChunkOverlap] = useState(50);
 
-  onOptionsRef.current = () => ({
-    chunk_size: chunkSize,
-    chunk_overlap: chunkOverlap,
-  });
+  useEffect(() => {
+    onOptionsRef.current = () => ({
+      chunk_size: chunkSize,
+      chunk_overlap: chunkOverlap,
+    });
+  }, [chunkOverlap, chunkSize, onOptionsRef]);
 
   return (
     <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
@@ -513,7 +511,7 @@ export default function LabPage() {
             </div>
             <ExperimentPanel
               strategies={MODEL_STRATEGIES}
-              defaultStrategies={["kimi", "glm"]}
+              defaultStrategies={["kimi", "ark"]}
             />
           </div>
         </TabsContent>

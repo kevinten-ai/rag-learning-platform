@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { batchGenerateEmbeddingsWithStats } from '@/lib/embedding/zhipu';
+import { batchGenerateEmbeddingsWithStats } from '@/lib/embedding/ark';
 import { computeUMAP3D, computeSimilarityMatrix } from '@/lib/rag/umap';
 import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 

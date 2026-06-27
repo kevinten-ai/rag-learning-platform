@@ -6,7 +6,7 @@
 
 **Architecture:** Layer advanced RAG strategies (Contextual Retrieval, Self-RAG, CRAG, Adaptive Routing, Graph RAG) on top of the existing pipeline. Each technique is a pluggable module with full trace visualization. A new Benchmark page provides quantitative comparison. A guided Demo Mode walks judges through capabilities.
 
-**Tech Stack:** Next.js 16 + TypeScript, Zhipu GLM-4 + Embedding-3, Supabase pgvector, existing glass-box trace infrastructure.
+**Tech Stack:** Next.js 16 + TypeScript, Volcengine Ark Ark CodingPlan + Embedding-3, Supabase pgvector, existing glass-box trace infrastructure.
 
 ---
 
@@ -17,7 +17,7 @@
 2. **4 Chunking Strategies** - Fixed-size, Recursive, Semantic, Document-aware
 3. **3 Retrieval Modes** - Semantic (cosine), Keyword (BM25), Hybrid (RRF)
 4. **3 Query Enhancers** - Rewrite, HyDE, Multi-Query
-5. **LLM Reranking** - GLM-based relevance scoring with filtering
+5. **LLM Reranking** - Ark-based relevance scoring with filtering
 6. **3-Metric Evaluation** - Relevance, Faithfulness, Completeness
 7. **Lab Page** - A/B strategy comparison with radar charts
 8. **One-Click Demo** - Sample documents + preset questions
@@ -71,7 +71,7 @@
 - [ ] **Step 1: Create context generator module**
 
 Create `web/src/lib/rag/context-generator.ts`:
-- Import generateText from 'ai' and glmModel from '@/lib/llm/glm'
+- Import `generateText` from `ai` and `arkModel` from `@/lib/llm/ark`
 - Export function generateChunkContext(fullDocument: string, chunk: string): Promise<string>
 - System prompt: instruct model to describe chunk's position and topic within the full document in under 100 chars
 - Truncate document to first 6000 chars to manage tokens
@@ -373,7 +373,7 @@ Visual page with:
 
 - [ ] **Step 1: Create entity extractor**
 
-Use GLM to extract named entities and relationships from chunks. Store as simple JSON graph structure.
+Use Ark to extract named entities and relationships from chunks. Store as simple JSON graph structure.
 
 - [ ] **Step 2: Create entity API**
 

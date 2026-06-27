@@ -15,6 +15,8 @@ interface CostRow {
   estimatedCost: number;
 }
 
+const DEFAULT_ARK_CHAT_MODEL = "doubao-seed-2-0-code-preview-260215";
+
 function buildCostRows(trace: RAGTrace): CostRow[] {
   const rows: CostRow[] = [];
 
@@ -22,7 +24,7 @@ function buildCostRows(trace: RAGTrace): CostRow[] {
   if (trace.steps.queryRouting) {
     rows.push({
       stage: "智能路由",
-      model: "glm-4-flash",
+      model: DEFAULT_ARK_CHAT_MODEL,
       promptTokens: 0,
       completionTokens: 0,
       estimatedCost: 0.0005,
@@ -34,7 +36,7 @@ function buildCostRows(trace: RAGTrace): CostRow[] {
     const strategies = trace.steps.queryUnderstanding.activeStrategies;
     rows.push({
       stage: `查询增强 (${strategies.join('+')})`,
-      model: "glm-4-flash",
+      model: DEFAULT_ARK_CHAT_MODEL,
       promptTokens: 0,
       completionTokens: 0,
       estimatedCost: strategies.length * 0.0005,
@@ -55,7 +57,7 @@ function buildCostRows(trace: RAGTrace): CostRow[] {
   if (trace.steps.crag) {
     rows.push({
       stage: "CRAG 校正",
-      model: "glm-4-flash",
+      model: DEFAULT_ARK_CHAT_MODEL,
       promptTokens: 0,
       completionTokens: 0,
       estimatedCost: trace.steps.crag.retrialPerformed ? 0.002 : 0.001,
@@ -86,7 +88,7 @@ function buildCostRows(trace: RAGTrace): CostRow[] {
   if (trace.selfRag) {
     rows.push({
       stage: "Self-RAG 反思",
-      model: "glm-4-flash",
+      model: DEFAULT_ARK_CHAT_MODEL,
       promptTokens: 0,
       completionTokens: 0,
       estimatedCost: 0.001 + (trace.selfRag.additionalRetrievals * 0.001),

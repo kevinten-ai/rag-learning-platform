@@ -1,5 +1,6 @@
-import { generateObject } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { generateText } from 'ai'
+import { arkModel } from '@/lib/llm/ark'
+import { parseJsonObject } from '@/lib/llm/json'
 import { z } from 'zod'
 
 const RouteSchema = z.object({
@@ -14,9 +15,8 @@ const RouteSchema = z.object({
 export type QueryRoute = z.infer<typeof RouteSchema>
 
 export async function routeQuery(question: string): Promise<QueryRoute> {
-  const { object } = await generateObject({
-    model: glmModel,
-    schema: RouteSchema,
+  const { text } = await generateText({
+    model: arkModel,
     system: `你是一个RAG查询路由专家。根据用户问题的类型和复杂度，决定最优的检索策略。
 
 规则：
@@ -29,10 +29,21 @@ export async function routeQuery(question: string): Promise<QueryRoute> {
 - no_rag（不需要检索）：闲聊、数学计算等不需要外部知识的问题
   示例：你好、1+1等于几、今天天气怎么样
 
-suggestedEnhancers 可选值：rewrite, hyde, multi-query`,
+suggestedEnhancers 可选值：rewrite, hyde, multi-query
+
+只输出一个 JSON 对象，不要输出 Markdown、解释或额外文本。JSON 格式：
+{
+  "type": "simple | analytical | comparison | no_rag",
+  "reasoning": "简短理由",
+  "suggestedEnhancers": ["rewrite"],
+  "suggestedRetrieval": "semantic | keyword | hybrid",
+  "suggestedTopK": 5,
+  "needsReranking": true
+}`,
     prompt: `用户问题：${question}`,
     temperature: 0.1,
     maxOutputTokens: 200,
   })
-  return object
+
+  return RouteSchema.parse(parseJsonObject<unknown>(text))
 }

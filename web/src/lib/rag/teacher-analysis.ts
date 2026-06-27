@@ -1,11 +1,11 @@
 import { streamText, generateText } from 'ai'
-import { glmTeacherModel } from '@/lib/llm/glm'
+import { arkTeacherModel } from '@/lib/llm/ark'
 import type { RAGTrace } from '@/types/rag'
 
 /**
- * GLM-5 Teacher Analysis Module
+ * Ark teacher analysis module.
  *
- * Uses the GLM-5 "teacher" model to provide educational explanations
+ * Uses the configured Ark teacher model to provide educational explanations
  * of the RAG pipeline results, helping users understand:
  * - Why certain retrieval results were chosen
  * - How reranking changed the ordering
@@ -79,7 +79,7 @@ export async function explainStep(
   const stepName = STEP_NAMES[stepKey] || stepKey
 
   const { text } = await generateText({
-    model: glmTeacherModel,
+    model: arkTeacherModel,
     system: STEP_EXPLANATION_PROMPT,
     prompt: `步骤名称：${stepName}\n\n用户问题：${question}\n\n步骤执行数据：\n${JSON.stringify(stepData, null, 2).slice(0, 3000)}`,
     temperature: 0.3,
@@ -96,7 +96,7 @@ export function streamFullAnalysis(trace: RAGTrace) {
   const traceJson = JSON.stringify(trace, null, 2).slice(0, 8000)
 
   return streamText({
-    model: glmTeacherModel,
+    model: arkTeacherModel,
     system: FULL_ANALYSIS_PROMPT,
     prompt: `用户问题：${trace.question}\n\n完整 Trace 数据：\n${traceJson}`,
     temperature: 0.3,
@@ -113,7 +113,7 @@ export async function compareConfigs(
   configB: { name: string; metrics: Record<string, number> }
 ): Promise<string> {
   const { text } = await generateText({
-    model: glmTeacherModel,
+    model: arkTeacherModel,
     system: `你是一位 RAG 技术教学专家。对比两组 RAG 配置的性能指标，用通俗语言解释差异原因和最佳选择。使用中文，控制在 300 字以内。`,
     prompt: `问题：${question}\n\n配置 A（${configA.name}）：\n${JSON.stringify(configA.metrics, null, 2)}\n\n配置 B（${configB.name}）：\n${JSON.stringify(configB.metrics, null, 2)}`,
     temperature: 0.3,

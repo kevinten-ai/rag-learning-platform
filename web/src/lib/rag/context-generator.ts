@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel } from '@/lib/llm/ark'
 
 const CONTEXT_PROMPT = `你是一个文档分析专家。给定一篇完整文档和其中的一个文本片段，请用1-2句话简要描述该片段在整篇文档中的位置和主题。
 
@@ -21,7 +21,7 @@ export async function generateChunkContext(
   const truncatedDoc = fullDocument.slice(0, 6000)
 
   const { text } = await generateText({
-    model: glmModel,
+    model: arkModel,
     system: CONTEXT_PROMPT,
     prompt: `<文档>\n${truncatedDoc}\n</文档>\n\n<片段>\n${chunk}\n</片段>`,
     temperature: 0.1,

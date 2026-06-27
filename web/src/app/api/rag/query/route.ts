@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { streamText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel, getArkChatModelName } from '@/lib/llm/ark'
 import { RAGTracer } from '@/lib/rag/tracer'
 import { routeQuery } from '@/lib/rag/query-router'
 import { rewriteQuery } from '@/lib/rag/query-enhancers/rewriter'
@@ -15,7 +15,7 @@ import { assessRetrieval } from '@/lib/rag/corrective-rag'
 import { selfRAGGenerate } from '@/lib/rag/self-rag'
 import { constructPrompt } from '@/lib/rag/generator'
 import { evaluateAnswer } from '@/lib/rag/evaluator'
-import { generateEmbedding } from '@/lib/embedding/zhipu'
+import { generateEmbedding, getArkEmbeddingModelName } from '@/lib/embedding/ark'
 import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server'
 import { createServerSupabaseClient } from '@/lib/supabase/client'
 import type { RetrievalResult } from '@/types/rag'
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       question,
       mode: requestedMode = 'auto',
       enhancers: rawEnhancers = [],
-      model = 'glm',
+      model = 'ark',
       collection_id: requestedCollectionId,
       top_k: requestedTopK = 5,
       rerank: requestedRerank = true,
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       const genStart = Date.now()
 
       const result = streamText({
-        model: glmModel,
+        model: arkModel,
         system: '你是一个友好的AI助手。直接回答用户的问题，不需要引用任何参考资料。',
         prompt: question,
         onFinish: async ({ text, usage }) => {
@@ -154,11 +154,11 @@ export async function POST(request: NextRequest) {
           const completionTokens = usage?.outputTokens ?? 0
           tracer.recordGeneration({
             durationMs: Date.now() - genStart,
-            model: process.env.GLM_MODEL || 'glm-4-flash',
+            model: getArkChatModelName(),
             answer: text,
             tokensUsed: { prompt: promptTokens, completion: completionTokens, total: promptTokens + completionTokens },
             sources: [],
-            estimatedCost: estimateCost(process.env.GLM_MODEL || 'glm-4-flash', promptTokens, completionTokens),
+            estimatedCost: estimateCost(getArkChatModelName(), promptTokens, completionTokens),
           })
           try {
             const finalTrace = tracer.finalize()
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
 
     tracer.recordEmbedding({
       durationMs: Date.now() - embStart,
-      model: 'embedding-3',
+      model: getArkEmbeddingModelName(),
       dimensions: embedding.length,
       vector: embedding,
       tokensUsed,
@@ -368,7 +368,7 @@ export async function POST(request: NextRequest) {
 
       tracer.recordReranking({
         durationMs: rerankOutput.durationMs,
-        model: 'glm-reranker',
+        model: getArkChatModelName(),
         before: rerankOutput.before,
         after: rerankOutput.after,
         filtered: rerankOutput.filtered,
@@ -412,8 +412,8 @@ export async function POST(request: NextRequest) {
     // ----------------------------------------------------------------
     // Step 6 - Generation (streaming)
     // ----------------------------------------------------------------
-    const selectedModel = glmModel
-    const modelName = process.env.GLM_MODEL || 'glm-4-flash'
+    const selectedModel = arkModel
+    const modelName = getArkChatModelName()
     const generationStart = Date.now()
 
     // Capture user.id for the onFinish callback closure
@@ -584,7 +584,7 @@ function estimateCost(
   // Rough cost estimates per 1M tokens (CNY)
   const rates: Record<string, { prompt: number; completion: number }> = {
     'moonshot-v1-128k': { prompt: 60, completion: 60 },
-    'glm-4-flash': { prompt: 1, completion: 1 },
+    'doubao-seed-2-0-code-preview-260215': { prompt: 1, completion: 1 },
   }
   const rate = rates[model] ?? { prompt: 10, completion: 10 }
   return (

@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel } from '@/lib/llm/ark'
 
 export interface DecompositionResult {
   isComplex: boolean
@@ -41,7 +41,7 @@ export async function decomposeQuery(
 
   try {
     const { text } = await generateText({
-      model: glmModel,
+      model: arkModel,
       system: DECOMPOSE_PROMPT,
       prompt: question,
       temperature: 0.1,
@@ -109,7 +109,7 @@ export async function synthesizeAnswers(
         : '请将各个子回答合并为一个完整的答案。'
 
   const { text } = await generateText({
-    model: glmModel,
+    model: arkModel,
     system: `${SYNTHESIZE_PROMPT}\n\n${strategyHint}`,
     prompt: `原始问题：${originalQuestion}\n\n${subContent}`,
     maxOutputTokens: 1500,

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 import { SAMPLE_DOCUMENTS } from '@/lib/rag/sample-documents';
 import { recursiveChunk } from '@/lib/rag/chunkers/recursive';
-import { batchGenerateEmbeddings } from '@/lib/embedding/zhipu';
+import { batchGenerateEmbeddings } from '@/lib/embedding/ark';
 import { insertChunks } from '@/lib/supabase/vectors';
 
 const QUICK_START_COLLECTION_NAME = '快速入门示例';

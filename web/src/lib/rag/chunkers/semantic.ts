@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { generateEmbedding } from '@/lib/embedding/zhipu';
+import { generateEmbedding } from '@/lib/embedding/ark';
 import { estimateTokenCount } from '../token-utils';
 import type { ChunkerOptions, ChunkResult } from '@/types/rag';
 

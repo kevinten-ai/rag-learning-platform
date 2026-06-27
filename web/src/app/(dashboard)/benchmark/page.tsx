@@ -422,7 +422,7 @@ export default function BenchmarkPage() {
           <p className="text-muted-foreground text-sm mb-4">
             选择一个或多个 RAG 策略配置，运行标准化测试集来量化对比效果。
             <br />
-            建议先导入示例文档（首页"一键体验"），再运行测试。
+            建议先导入示例文档（首页“一键体验”），再运行测试。
           </p>
         </Card>
       )}

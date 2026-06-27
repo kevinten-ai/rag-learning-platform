@@ -6,7 +6,7 @@ import { recursiveChunk } from '@/lib/rag/chunkers/recursive';
 import { fixedSizeChunk } from '@/lib/rag/chunkers/fixed-size';
 import { documentAwareChunk } from '@/lib/rag/chunkers/document-aware';
 import { chunkContextual } from '@/lib/rag/chunkers/contextual';
-import { batchGenerateEmbeddingsWithStats } from '@/lib/embedding/zhipu';
+import { batchGenerateEmbeddingsWithStats } from '@/lib/embedding/ark';
 import { computeUMAP3D, computeSimilarityMatrix } from '@/lib/rag/umap';
 import { createAuthenticatedSupabaseClient } from '@/lib/supabase/auth-server';
 import { insertChunks } from '@/lib/supabase/vectors';
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     if (content) {
       // Direct content mode: skip Feishu fetch, use provided content directly
-      let stageStart = Date.now();
+      const stageStart = Date.now();
 
       // Extract basic structure from the provided content
       const headings: Array<{ level: number; text: string }> = [];

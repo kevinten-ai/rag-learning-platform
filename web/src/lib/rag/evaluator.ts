@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel } from '@/lib/llm/ark'
 
 const EVAL_PROMPT = `你是一个 RAG 系统质量评估专家。请评估给定的问答结果质量。
 
@@ -26,7 +26,7 @@ export async function evaluateAnswer(
 
   try {
     const { text } = await generateText({
-      model: glmModel,
+      model: arkModel,
       system: EVAL_PROMPT,
       prompt: userPrompt,
     })

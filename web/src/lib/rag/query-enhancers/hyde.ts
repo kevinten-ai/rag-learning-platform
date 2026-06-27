@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel } from '@/lib/llm/ark'
 
 const HYDE_PROMPT = `你是一个知识库文档生成专家。给定一个用户问题，请生成一段假设性的知识库文档段落，这段内容应该是回答该问题时最可能在知识库中找到的原始文档片段。
 
@@ -16,7 +16,7 @@ export async function generateHyDE(
 
   try {
     const { text } = await generateText({
-      model: glmModel,
+      model: arkModel,
       system: HYDE_PROMPT,
       prompt: question,
     })

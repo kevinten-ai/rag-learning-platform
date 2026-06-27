@@ -23,11 +23,11 @@
 框架：        Next.js 14+ (App Router, TypeScript)
 部署：        Vercel
 数据库：      Supabase (Postgres + pgvector)
-嵌入模型：    智谱 Embedding-3 API
-对话模型：    Kimi K2.5 / GLM-4（通过 Vercel AI SDK）
+嵌入模型：    火山引擎 Ark Embedding-3 API
+对话模型：    Kimi K2.5 / Ark CodingPlan（通过 Vercel AI SDK）
 文档来源：    飞书开放平台 SDK (@larksuiteoapi/node-sdk)
 RAG 编排：    LangChain.js
-流式输出：    Vercel AI SDK (@ai-sdk/moonshotai + zhipu-ai-provider)
+流式输出：    Vercel AI SDK (@ai-sdk/moonshotai + -sdk/openai-compatible)
 可视化：      React Flow (流程图) + Recharts (图表) + Three.js/UMAP (3D 向量空间)
 样式：        Tailwind CSS + shadcn/ui
 ```
@@ -123,7 +123,7 @@ RAG 编排：    LangChain.js
 ```
 展示内容：
 - 嵌入过程：每个 chunk → API 调用 → 向量（显示前几个维度的数值）
-- 向量维度信息（智谱 Embedding-3: 1024/2048 维）
+- 向量维度信息（火山引擎 Ark Embedding-3: 1024/2048 维）
 - 2D/3D 向量空间投影（UMAP 降维）：
   · 每个点 = 一个 chunk
   · 颜色 = 来源文档
@@ -277,7 +277,7 @@ RAG 编排：    LangChain.js
 
 **Step 6 - LLM 生成**
 ```
-- 模型信息（Kimi K2.5 / GLM-4）
+- 模型信息（Kimi K2.5 / Ark CodingPlan）
 - 流式输出过程（逐字显示）
 - 答案中引用来源的高亮标注
 - Token 用量和费用估算
@@ -371,7 +371,7 @@ RAG 编排：    LangChain.js
 | Prompt 模板 | System + Context + Query 结构 | 查询页 Step 5 |
 | 流式输出 | 逐 token 生成并实时渲染 | 查询页答案面板 |
 | 来源引用 | 答案中标注引用来源 | 查询页答案面板 |
-| 模型切换 | Kimi vs GLM 对比 | 实验室 |
+| 模型切换 | Kimi vs Ark 对比 | 实验室 |
 
 ### 评估阶段（第6章）
 
@@ -503,10 +503,10 @@ rag-learning-demo/
 │   │   ├── parser.ts                 # 文档解析器
 │   │   └── link-resolver.ts          # 链接解析
 │   ├── embedding/
-│   │   └── zhipu.ts                  # 智谱 Embedding-3 封装
+│   │   └── ark.ts                  # 火山引擎 Ark Embedding-3 封装
 │   ├── llm/
 │   │   ├── kimi.ts                   # Kimi 模型配置
-│   │   └── glm.ts                    # GLM 模型配置
+│   │   └── ark.ts                    # Ark 模型配置
 │   └── supabase/
 │       ├── client.ts                 # Supabase 客户端
 │       ├── vectors.ts                # pgvector 操作封装
@@ -565,7 +565,7 @@ create table collections (
   chunk_strategy text default 'recursive',  -- 使用的分块策略
   chunk_size int default 500,
   chunk_overlap int default 50,
-  embedding_model text default 'embedding-3',
+  embedding_model text default 'doubao-embedding-vision-251215',
   embedding_dimensions int default 1024,
   created_at timestamptz default now()
 );
@@ -589,7 +589,7 @@ create table chunks (
   document_id uuid references documents(id) on delete cascade,
   collection_id uuid references collections(id) on delete cascade,
   content text not null,
-  embedding vector(1024),         -- 智谱 Embedding-3 向量
+  embedding vector(1024),         -- 火山引擎 Ark Embedding-3 向量
   chunk_index int,                -- 在文档中的序号
   token_count int,
   metadata jsonb default '{}',    -- 来源段落、标题层级等
@@ -756,7 +756,7 @@ Phase 1 - 骨架搭建
 ├── Next.js 项目初始化 + Tailwind + shadcn/ui
 ├── Supabase 项目创建 + pgvector 启用 + 表结构迁移
 ├── 飞书应用创建 + SDK 集成
-├── 智谱 Embedding-3 + Kimi/GLM 模型接入
+├── 火山引擎 Ark Embedding-3 + Kimi/Ark 模型接入
 └── 基础页面路由 + 布局
 
 Phase 2 - 摄入流水线 + 可视化
@@ -792,7 +792,7 @@ Phase 4 - 实验室 + 评估
 - [All-in-RAG 教程](https://github.com/datawhalechina/all-in-rag)
 - [飞书开放平台 Server SDK](https://open.feishu.cn/document/server-docs/server-side-sdk)
 - [Supabase pgvector 文档](https://supabase.com/docs/guides/database/extensions/pgvector)
-- [智谱 Embedding-3 文档](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3)
+- [火山引擎 Ark Embedding-3 文档](https://www.volcengine.com/docs/82379/1966993)
 - [Vercel AI SDK Moonshot Provider](https://ai-sdk.dev/providers/ai-sdk-providers/moonshotai)
-- [Vercel AI SDK Zhipu Provider](https://ai-sdk.dev/providers/community-providers/zhipu)
+- [AI SDK OpenAI Compatible Provider](https://ai-sdk.dev/providers/openai-compatible-providers)
 - [OpenRAG: 教育型 RAG 平台](https://www.opensourceprojects.dev/post/bd7835df-5561-42e1-ba24-b9225e80482f)

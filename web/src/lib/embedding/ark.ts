@@ -1,4 +1,6 @@
-const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/embeddings'
+export const DEFAULT_ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/coding/v3'
+export const DEFAULT_ARK_EMBEDDING_MODEL = 'doubao-embedding-vision-251215'
+export const DEFAULT_ARK_EMBEDDING_DIMENSIONS = 1024
 
 interface EmbeddingResponse {
   data: Array<{ embedding: number[]; index: number }>
@@ -7,30 +9,37 @@ interface EmbeddingResponse {
 
 export async function generateEmbedding(
   text: string,
-  dimensions: number = 1024
+  dimensions: number = Number(process.env.ARK_EMBEDDING_DIMENSIONS || DEFAULT_ARK_EMBEDDING_DIMENSIONS)
 ): Promise<{ embedding: number[]; tokensUsed: number }> {
-  const response = await fetch(ZHIPU_API_URL, {
+  const apiKey = process.env.ARK_API_KEY
+  if (!apiKey) {
+    throw new Error('ARK_API_KEY is not configured')
+  }
+
+  const response = await fetch(`${getArkBaseUrl()}/embeddings`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.GLM_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'embedding-3',
+      model: getArkEmbeddingModelName(),
       input: text,
       dimensions,
+      encoding_format: 'float',
     }),
   })
 
   if (!response.ok) {
-    throw new Error(`Zhipu embedding API error: ${response.status}`)
+    const error = await response.text()
+    throw new Error(`Ark embedding API error (${response.status}): ${error}`)
   }
 
   const data: EmbeddingResponse = await response.json()
 
   if (!data.data || data.data.length === 0 || !data.data[0]) {
     throw new Error(
-      'Zhipu embedding API returned an empty or invalid data array — no embedding was produced for the given input'
+      'Ark embedding API returned an empty or invalid data array - no embedding was produced for the given input'
     )
   }
 
@@ -38,6 +47,14 @@ export async function generateEmbedding(
     embedding: data.data[0].embedding,
     tokensUsed: data.usage.total_tokens,
   }
+}
+
+export function getArkEmbeddingModelName(): string {
+  return process.env.ARK_EMBEDDING_MODEL || DEFAULT_ARK_EMBEDDING_MODEL
+}
+
+function getArkBaseUrl(): string {
+  return (process.env.ARK_BASE_URL || DEFAULT_ARK_BASE_URL).replace(/\/$/, '')
 }
 
 export async function batchGenerateEmbeddings(

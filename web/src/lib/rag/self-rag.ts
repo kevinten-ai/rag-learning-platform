@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { glmModel } from '@/lib/llm/glm'
+import { arkModel } from '@/lib/llm/ark'
 
 export interface SelfRAGReflection {
   paragraph: string
@@ -58,7 +58,7 @@ export async function selfRAGGenerate(
 
   // Step 1: Generate initial answer
   const { text: initialAnswer } = await generateText({
-    model: glmModel,
+    model: arkModel,
     system: `根据参考资料回答问题。使用 [N] 标注引用来源。保持准确、简洁。\n\n参考资料：\n${allContext}`,
     prompt: question,
     maxOutputTokens: 1000,
@@ -72,7 +72,7 @@ export async function selfRAGGenerate(
   for (const paragraph of paragraphs) {
     try {
       const { text } = await generateText({
-        model: glmModel,
+        model: arkModel,
         system: REFLECTION_PROMPT,
         prompt: `问题：${question}\n\n参考资料（前3000字）：\n${allContext.slice(0, 3000)}\n\n待评估段落：\n${paragraph}`,
         temperature: 0.1,
@@ -137,7 +137,7 @@ export async function selfRAGGenerate(
       .join('; ')
 
     const { text: revisedAnswer } = await generateText({
-      model: glmModel,
+      model: arkModel,
       system: `根据参考资料重新回答问题。之前的回答存在以下问题：${critiques}。请修正这些问题。使用 [N] 标注引用来源。\n\n参考资料：\n${allContext}`,
       prompt: question,
       maxOutputTokens: 1000,

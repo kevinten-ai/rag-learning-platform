@@ -22,15 +22,19 @@ export function SourceAttribution({ sources, highlightIndex }: SourceAttribution
   // When highlightIndex changes, flash the corresponding source
   useEffect(() => {
     if (highlightIndex != null && highlightIndex >= 1 && highlightIndex <= sources.length) {
-      setFlashIndex(highlightIndex);
-      // Scroll the source element into view
-      const el = document.getElementById(`source-ref-${highlightIndex}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      // Clear flash after animation
-      const timer = setTimeout(() => setFlashIndex(null), 2000);
-      return () => clearTimeout(timer);
+      const flashTimer = window.setTimeout(() => {
+        setFlashIndex(highlightIndex);
+        // Scroll the source element into view
+        const el = document.getElementById(`source-ref-${highlightIndex}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 0);
+      const clearTimer = window.setTimeout(() => setFlashIndex(null), 2000);
+      return () => {
+        window.clearTimeout(flashTimer);
+        window.clearTimeout(clearTimer);
+      };
     }
   }, [highlightIndex, sources.length]);
 

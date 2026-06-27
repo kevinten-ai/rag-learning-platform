@@ -480,7 +480,7 @@ export default function QueryPage() {
             </Card>
           )}
 
-          {/* GLM-5 Teacher Analysis */}
+          {/* Ark teacher analysis */}
           <TeacherAnalysis trace={trace} />
         </div>
       </div>
