@@ -1,1 +1,4 @@
 .vercel
+.playwright-mcp/
+rag-demo-dashboard.png
+supabase/.temp/

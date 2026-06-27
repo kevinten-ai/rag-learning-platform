@@ -9,7 +9,9 @@ for (const line of envContent.split('\n')) {
   if (match) env[match[1]] = match[2];
 }
 
-const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  db: { schema: 'rag' },
+});
 
 async function checkColumn(table) {
   const { error } = await supabase.from(table).select('user_id').limit(0);
@@ -31,7 +33,7 @@ async function run() {
     console.log('Attempting alternative: using Supabase Management API...');
 
     // Try management API
-    const projectRef = 'evljxrlicctchscyfuan';
+    const projectRef = 'lvazmokpqrywaysgxspg';
     const migrationSql = `
       ALTER TABLE collections ADD COLUMN IF NOT EXISTS user_id uuid;
       ALTER TABLE documents ADD COLUMN IF NOT EXISTS user_id uuid;
@@ -52,7 +54,7 @@ async function run() {
     console.log('REST API status:', resp.status);
 
     console.log('\n--- MANUAL MIGRATION REQUIRED ---');
-    console.log('Go to: https://supabase.com/dashboard/project/evljxrlicctchscyfuan/sql/new');
+    console.log('Go to: https://supabase.com/dashboard/project/lvazmokpqrywaysgxspg/sql/new');
     console.log('And run this SQL:\n');
     console.log(migrationSql);
   } else {
